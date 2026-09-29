@@ -1,0 +1,25 @@
+# Rust build output
+/target/
+*.rs.bk
+
+# Web dependencies and build output
+/web/node_modules/
+/web/dist/
+/web/coverage/
+/web/.vite/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Reports and analysis output
+/reports/
+/.sonar/
+
+# Editor and operating system files
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
