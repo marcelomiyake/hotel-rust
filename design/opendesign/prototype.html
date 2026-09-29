@@ -1,0 +1,1012 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f0e7">
+  <title>Vela House — Stay Well.</title>
+  <style>
+    /* OD-LAYOUT-PRIMITIVES v1 — structure only: display, flex/grid, overflow, wrapping, ratio.
+       Put this @layer first; product CSS outside the layer always wins. */
+    @layer od-layout {
+      :where(.od-stack,.od-row,.od-row-top,.od-cluster,.od-grid,.od-field,.od-stat,.od-cell,.od-tile) > :where(*) { min-width: 0; }
+      .od-stack   { display: flex; flex-direction: column; gap: var(--od-gap, 8px); }
+      .od-row     { display: flex; align-items: center; gap: var(--od-gap, 8px); }
+      .od-row-top { display: flex; align-items: flex-start; gap: var(--od-gap, 8px); }
+      .od-cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--od-gap, 8px); }
+      .od-fill    { flex: 1 1 0; min-width: 0; }
+      .od-fixed   { flex: none; }
+      .od-grid    { display: grid; gap: var(--od-gap, 12px); grid-template-columns: repeat(var(--od-cols, 3), minmax(0, 1fr)); }
+      .od-stat, .od-field, .od-cell { display: grid; gap: var(--od-gap, 2px); }
+      :where(.od-stat,.od-field,.od-cell) > :where(*) { display: block; }
+      .od-tile { display: grid; grid-template-rows: auto 1fr; }
+      :where(.od-tile) > :where(*) { display: block; }
+      .od-media { display: block; width: 100%; height: auto; aspect-ratio: var(--od-ratio, auto); }
+      .od-media-cover { object-fit: cover; }
+      .od-truncate { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+      .od-clamp-2, .od-clamp-3 { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+      .od-clamp-2 { -webkit-line-clamp: 2; }
+      .od-clamp-3 { -webkit-line-clamp: 3; }
+      .od-lines-2 { min-height: calc(2 * 1.4em); }
+      .od-nowrap  { white-space: nowrap; }
+      .od-keep    { word-break: keep-all; overflow-wrap: anywhere; }
+      .od-screen { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; }
+      .od-scroll { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
+      .od-rail { display: flex; gap: var(--od-gap, 8px); overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; padding-inline: var(--od-rail-pad, 16px); scroll-padding-inline: var(--od-rail-pad, 16px); }
+      .od-rail::-webkit-scrollbar { display: none; }
+      :where(.od-rail) > :where(*) { flex: none; scroll-snap-align: start; }
+      :where(.od-rail) > :where(:last-child) { margin-inline-end: var(--od-rail-pad, 16px); }
+      .od-spacer { flex: none; visibility: hidden; pointer-events: none; }
+      .od-touch  { min-width: 44px; min-height: 44px; }
+    }
+    /* /OD-LAYOUT-PRIMITIVES v1 */
+
+    :root {
+      color-scheme: light;
+      --limestone: #f3f0e7;
+      --paper: #fbfaf6;
+      --pine: #183b32;
+      --pine-deep: #102e27;
+      --terracotta: #8b4c39;
+      --ink: #26312d;
+      --muted: #59645e;
+      --line: #d8d2c5;
+      --soft-line: #e6e0d4;
+      --white: #fffefa;
+      --space-1: 8px;
+      --space-2: 16px;
+      --space-3: 24px;
+      --space-4: 32px;
+      --space-5: 48px;
+      --space-6: 64px;
+      --serif: "Iowan Old Style", Baskerville, ui-serif, Georgia, serif;
+      --sans: "Avenir Next", ui-sans-serif, system-ui, sans-serif;
+      --radius-small: 4px;
+      --radius-medium: 8px;
+      --page-width: 1400px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--limestone);
+      color: var(--ink);
+      font: 16px/1.6 var(--sans);
+    }
+    [hidden] { display: none !important; }
+    img { max-width: 100%; }
+    button, input, select { font: inherit; }
+    button { color: inherit; }
+    a { color: inherit; }
+    a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 3px solid var(--terracotta);
+      outline-offset: 3px;
+    }
+    .skip-link {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 10;
+      transform: translateY(-160%);
+      padding: 12px 16px;
+      background: var(--white);
+      color: var(--pine-deep);
+      border: 1px solid var(--pine);
+    }
+    .skip-link:focus { transform: translateY(0); }
+    .site-header {
+      border-bottom: 1px solid var(--line);
+      background: var(--limestone);
+    }
+    .header-inner {
+      width: min(100% - 64px, var(--page-width));
+      min-height: 88px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      color: var(--pine);
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: .16em;
+      white-space: nowrap;
+    }
+    .brand-mark { font-family: var(--serif); font-size: 24px; font-weight: 500; letter-spacing: .1em; }
+    .primary-nav { display: flex; align-items: center; gap: 8px; }
+    .nav-button {
+      min-height: 44px;
+      padding: 8px 16px;
+      border: 1px solid transparent;
+      border-radius: var(--radius-small);
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+      transition: background-color 180ms ease-out, border-color 180ms ease-out;
+    }
+    .nav-button:hover { border-color: var(--line); background: rgba(255,255,255,.38); }
+    .nav-button[aria-current="page"] { color: var(--pine); border-color: var(--line); background: var(--paper); }
+    .preview-label {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-align: right;
+      text-transform: uppercase;
+    }
+    .site-main { width: min(100% - 64px, var(--page-width)); margin: 0 auto; }
+    .page-view { padding: 48px 0 80px; }
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, .86fr) minmax(0, 1.14fr);
+      align-items: center;
+      gap: 48px;
+      padding: 16px 0 32px;
+    }
+    .eyebrow {
+      margin: 0 0 16px;
+      color: var(--terracotta);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3, p { overflow-wrap: anywhere; }
+    h1, h2, h3 { margin-top: 0; color: var(--pine); }
+    h1, h2, .serif { font-family: var(--serif); font-weight: 400; }
+    .hero h1 {
+      max-width: 10ch;
+      margin: 0;
+      font-size: clamp(48px, 6.5vw, 88px);
+      line-height: .98;
+      letter-spacing: -.045em;
+    }
+    .hero-copy {
+      max-width: 42ch;
+      margin: 24px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.65;
+    }
+    .hero-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 24px;
+      color: var(--pine);
+      font-weight: 700;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 5px;
+    }
+    .hero-photo { margin: 0; min-width: 0; }
+    .hero-photo img { border-radius: 2px; }
+    .photo-credit {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 4px 16px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .photo-credit a { text-decoration-thickness: 1px; text-underline-offset: 2px; }
+    .search-panel {
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-small);
+      background: var(--paper);
+    }
+    .search-panel__heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 16px;
+    }
+    .search-panel__heading h2 { margin: 0; font-size: 26px; }
+    .search-panel__heading p { margin: 0; color: var(--muted); font-size: 14px; }
+    .search-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr 1fr .8fr auto;
+      align-items: end;
+      gap: 16px;
+    }
+    .od-field { gap: 8px; }
+    .od-field > span, .field-label {
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .02em;
+    }
+    .field-control {
+      width: 100%;
+      min-height: 48px;
+      padding: 10px 12px;
+      border: 1px solid #aaa99c;
+      border-radius: var(--radius-small);
+      background: var(--white);
+      color: var(--ink);
+    }
+    .button {
+      display: inline-flex;
+      min-height: 48px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border: 1px solid var(--pine);
+      border-radius: var(--radius-small);
+      background: transparent;
+      color: var(--pine);
+      cursor: pointer;
+      font-weight: 700;
+      line-height: 1.25;
+      text-align: center;
+      text-decoration: none;
+      transition: background-color 180ms ease-out, color 180ms ease-out, transform 180ms ease-out;
+    }
+    .button:hover { transform: translateY(-1px); background: var(--pine); color: var(--white); }
+    .button:active { transform: translateY(0); }
+    .button--primary { background: var(--pine); color: var(--white); }
+    .button--primary:hover { background: var(--pine-deep); border-color: var(--pine-deep); }
+    .button--small { min-height: 44px; padding: 10px 14px; font-size: 14px; }
+    .button--quiet { border-color: var(--line); background: var(--paper); color: var(--pine); }
+    .button--quiet:hover { border-color: var(--pine); }
+    .button--danger { border-color: #9c493d; color: #7f3029; }
+    .button--danger:hover { background: #7f3029; color: white; }
+    .field-error { min-height: 24px; margin: 8px 0 0; color: #7f3029; font-size: 14px; }
+    .home-note {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--line);
+    }
+    .home-note h2 { margin: 0; font-size: 30px; }
+    .home-note p { max-width: 50ch; margin: 0; color: var(--muted); }
+    .page-heading-row {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+    .page-heading-row h1, .view-heading h1 { margin: 0; font-size: clamp(40px, 5vw, 64px); line-height: 1.04; letter-spacing: -.035em; }
+    .page-heading-row .eyebrow, .view-heading .eyebrow { margin-bottom: 12px; }
+    .page-heading-row p, .view-heading .lede { max-width: 64ch; margin: 12px 0 0; color: var(--muted); }
+    .results-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin: 24px 0 16px;
+      padding: 12px 0;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .hotel-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 24px; }
+    .hotel-card {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-small);
+      background: var(--paper);
+    }
+    .hotel-card figure { margin: 0; }
+    .hotel-card figure img { border-bottom: 1px solid var(--line); }
+    .hotel-card__body { display: flex; min-height: 100%; flex-direction: column; padding: 24px; }
+    .hotel-card__body h2 { margin: 0; font-size: 32px; line-height: 1.1; }
+    .hotel-card__location { margin: 8px 0 16px; color: var(--muted); font-size: 14px; }
+    .hotel-card__description { margin: 0 0 16px; color: var(--ink); }
+    .hotel-card__meta { margin: auto 0 16px; padding-top: 16px; border-top: 1px solid var(--soft-line); color: var(--muted); font-size: 14px; }
+    .hotel-card__price { display: flex; align-items: baseline; gap: 6px; margin: 0 0 16px; }
+    .hotel-card__price strong { color: var(--pine); font-size: 24px; }
+    .hotel-card__price span { color: var(--muted); font-size: 14px; }
+    .hotel-card__body .button { width: 100%; }
+    .view-heading { margin-bottom: 24px; }
+    .back-link {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 24px;
+      padding: 8px 0;
+      border: 0;
+      background: transparent;
+      color: var(--pine);
+      cursor: pointer;
+      font-weight: 700;
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 4px;
+    }
+    .stay-intro {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, .8fr);
+      align-items: center;
+      gap: 32px;
+      margin-bottom: 32px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--line);
+    }
+    .stay-intro figure { margin: 0; }
+    .stay-intro h1 { margin: 0; font-size: clamp(40px, 5vw, 64px); line-height: 1.02; }
+    .stay-intro p:not(.eyebrow) { max-width: 52ch; margin: 16px 0 0; color: var(--muted); }
+    .room-list { display: grid; gap: 0; border-top: 1px solid var(--line); }
+    .room-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 24px;
+      padding: 24px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .room-row h2 { margin: 0; font-family: var(--serif); font-size: 28px; font-weight: 400; }
+    .room-row p { margin: 8px 0 0; color: var(--muted); }
+    .room-row__rate { text-align: right; }
+    .room-row__rate strong { display: block; color: var(--pine); font-size: 22px; }
+    .room-row__rate span { display: block; color: var(--muted); font-size: 13px; }
+    .room-row__availability { display: block; margin-top: 8px; color: var(--terracotta); font-size: 13px; font-weight: 700; }
+    .room-row .button { min-width: 150px; }
+    .booking-layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr); align-items: start; gap: 32px; }
+    .form-panel, .summary-panel, .empty-state, .confirmation-panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-small);
+      background: var(--paper);
+    }
+    .form-panel, .summary-panel { padding: 24px; }
+    .form-panel h2, .summary-panel h2 { margin: 0 0 20px; font-family: var(--serif); font-size: 28px; font-weight: 400; }
+    .guest-fields { display: grid; gap: 16px; }
+    .form-help { margin: 16px 0; color: var(--muted); font-size: 14px; }
+    .form-panel .button { width: 100%; margin-top: 16px; }
+    .summary-panel { position: sticky; top: 24px; }
+    .summary-hotel { margin: 0 0 4px; color: var(--pine); font-family: var(--serif); font-size: 24px; }
+    .summary-room { margin: 0 0 20px; color: var(--muted); }
+    .summary-line { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--soft-line); }
+    .summary-line span:first-child { color: var(--muted); }
+    .summary-line strong { color: var(--pine); text-align: right; }
+    .summary-total { margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 18px; }
+    .summary-total strong { font-size: 22px; }
+    .confirmation-panel { max-width: 760px; margin: 0 auto; padding: clamp(24px, 5vw, 56px); text-align: center; }
+    .confirmation-mark {
+      display: grid;
+      width: 56px;
+      height: 56px;
+      place-items: center;
+      margin: 0 auto 24px;
+      border: 1px solid var(--pine);
+      border-radius: 50%;
+      color: var(--pine);
+      font-size: 26px;
+    }
+    .confirmation-panel h1 { margin: 0; font-size: clamp(40px, 5vw, 64px); line-height: 1.05; }
+    .confirmation-panel > p { max-width: 56ch; margin: 16px auto; color: var(--muted); }
+    .confirmation-code { display: inline-block; margin: 8px auto 24px; padding: 8px 16px; border: 1px solid var(--line); color: var(--pine); font-weight: 700; letter-spacing: .08em; }
+    .confirmation-summary { max-width: 440px; margin: 0 auto 24px; padding: 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; }
+    .confirmation-summary p { margin: 4px 0; }
+    .confirmation-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+    .trip-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 24px; }
+    .trip-card { padding: 24px; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--paper); }
+    .trip-card__top { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--soft-line); }
+    .trip-card h2 { margin: 0; font-family: var(--serif); font-size: 28px; font-weight: 400; }
+    .trip-card__location { margin: 4px 0 0; color: var(--muted); }
+    .trip-tag { display: inline-block; padding: 4px 8px; border: 1px solid var(--line); color: var(--pine); font-size: 12px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+    .trip-details { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+    .trip-details p { margin: 0; }
+    .trip-details span { display: block; color: var(--muted); font-size: 13px; }
+    .trip-details strong { display: block; color: var(--ink); }
+    .trip-card__foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 16px; border-top: 1px solid var(--soft-line); }
+    .trip-card__foot p { margin: 0; color: var(--muted); font-size: 14px; }
+    .trip-card__foot strong { color: var(--pine); font-size: 18px; }
+    .staff-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 32px; }
+    .staff-stat { padding: 20px 24px; border: 1px solid var(--line); background: var(--paper); }
+    .staff-stat strong { display: block; color: var(--pine); font-family: var(--serif); font-size: 36px; font-weight: 400; line-height: 1.1; }
+    .staff-stat span { display: block; margin-top: 8px; color: var(--muted); }
+    .staff-section { margin-top: 32px; }
+    .staff-section h2 { margin: 0 0 16px; font-size: 32px; }
+    .inventory-list { display: grid; border-top: 1px solid var(--line); }
+    .inventory-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(150px, .7fr) auto;
+      align-items: center;
+      gap: 24px;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .inventory-row h3 { margin: 0; font-family: var(--serif); font-size: 23px; font-weight: 400; }
+    .inventory-row p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+    .inventory-count { color: var(--pine); font-weight: 700; }
+    .inventory-controls { display: flex; align-items: center; gap: 8px; }
+    .count-button {
+      display: inline-grid;
+      width: 44px;
+      height: 44px;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-small);
+      background: var(--paper);
+      color: var(--pine);
+      cursor: pointer;
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .count-button:hover { border-color: var(--pine); background: var(--limestone); }
+    .listing-control { min-width: 134px; }
+    .reservation-list { display: grid; gap: 12px; }
+    .reservation-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      background: var(--paper);
+    }
+    .reservation-row h3 { margin: 0; font-family: var(--serif); font-size: 22px; font-weight: 400; }
+    .reservation-row p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+    .empty-state { padding: 32px; }
+    .empty-state h2 { margin: 0; font-family: var(--serif); font-size: 30px; font-weight: 400; }
+    .empty-state p { max-width: 58ch; margin: 8px 0 20px; color: var(--muted); }
+    .site-footer { border-top: 1px solid var(--line); }
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      width: min(100% - 64px, var(--page-width));
+      margin: 0 auto;
+      padding: 24px 0 32px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .footer-inner p { max-width: 74ch; margin: 0; }
+    .footer-brand { color: var(--pine); font-weight: 700; letter-spacing: .1em; white-space: nowrap; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    @media (min-width: 1440px) {
+      .page-view { padding-top: 56px; }
+      .hero { gap: 64px; }
+    }
+    @media (max-width: 1024px) {
+      .header-inner, .site-main, .footer-inner { width: min(100% - 48px, var(--page-width)); }
+      .hero { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 32px; }
+      .search-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .search-grid .button { grid-column: 1 / -1; }
+      .hotel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .hotel-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; max-width: calc(50% - 12px); }
+    }
+    @media (max-width: 768px) {
+      .header-inner, .site-main, .footer-inner { width: min(100% - 40px, var(--page-width)); }
+      .header-inner { min-height: 80px; flex-wrap: wrap; gap: 8px 16px; padding: 16px 0; }
+      .preview-label { display: none; }
+      .hero { grid-template-columns: 1fr; gap: 24px; padding-top: 8px; }
+      .hero-copy { max-width: 56ch; }
+      .hero-photo { order: -1; }
+      .hero h1 { max-width: 12ch; }
+      .page-view { padding: 32px 0 56px; }
+      .hotel-grid { grid-template-columns: 1fr; }
+      .hotel-grid > :last-child:nth-child(odd) { grid-column: auto; max-width: none; }
+      .booking-layout { grid-template-columns: 1fr; }
+      .summary-panel { position: static; }
+      .stay-intro { grid-template-columns: 1fr; }
+      .stay-intro figure { order: -1; }
+      .trip-list { grid-template-columns: 1fr; }
+      .home-note { align-items: flex-start; flex-direction: column; }
+    }
+    @media (max-width: 600px) {
+      .header-inner, .site-main, .footer-inner { width: min(100% - 32px, var(--page-width)); }
+      .header-inner { align-items: flex-start; }
+      .brand { min-height: 44px; }
+      .primary-nav { width: 100%; justify-content: space-between; gap: 4px; }
+      .nav-button { flex: 1 1 auto; padding: 8px 10px; font-size: 14px; }
+      .search-panel { padding: 20px 16px; }
+      .search-panel__heading { align-items: flex-start; flex-direction: column; gap: 4px; }
+      .search-grid { grid-template-columns: 1fr; }
+      .search-grid .button { grid-column: auto; width: 100%; }
+      .page-heading-row { align-items: flex-start; flex-direction: column; }
+      .results-meta { align-items: flex-start; flex-direction: column; }
+      .room-row { grid-template-columns: minmax(0, 1fr) auto; gap: 16px; }
+      .room-row__rate { text-align: left; }
+      .room-row .button { grid-column: 1 / -1; width: 100%; }
+      .staff-summary { grid-template-columns: 1fr; }
+      .inventory-row { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+      .inventory-row .inventory-controls { grid-column: 1 / -1; justify-content: flex-start; }
+      .reservation-row { grid-template-columns: 1fr; gap: 8px; }
+      .reservation-row .button { justify-self: start; }
+      .trip-card__top, .trip-card__foot { align-items: flex-start; flex-direction: column; }
+      .footer-inner { flex-direction: column; }
+    }
+    @media (max-width: 375px) {
+      .header-inner, .site-main, .footer-inner { width: calc(100% - 32px); }
+      .brand-mark { font-size: 21px; }
+      .nav-button { padding-inline: 8px; font-size: 13px; }
+      .hero h1 { font-size: 48px; }
+      .page-heading-row h1, .view-heading h1 { font-size: 40px; }
+      .trip-details { grid-template-columns: 1fr; }
+      .trip-card, .form-panel, .summary-panel { padding: 20px 16px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="#stay" data-page-target="discover" aria-label="Vela House home">
+        <span class="brand-mark">VELA</span><span>HOUSE</span>
+      </a>
+      <nav class="primary-nav" aria-label="Main navigation">
+        <button class="nav-button" type="button" data-page-target="discover" aria-current="page">Stays</button>
+        <button class="nav-button" type="button" data-page-target="trips">My trips</button>
+        <button class="nav-button" type="button" data-page-target="staff">Staff</button>
+      </nav>
+      <p class="preview-label">Sample collection · no login</p>
+    </div>
+  </header>
+
+  <main id="main-content" class="site-main" tabindex="-1">
+    <section class="page-view" data-view="discover" aria-labelledby="hero-title">
+      <div class="hero">
+        <div class="hero-copy-block">
+          <p class="eyebrow">Independent coastal stays · Brazil</p>
+          <h1 id="hero-title">Stay well,<br>by the water.</h1>
+          <p class="hero-copy">A small collection of considered places along the Brazilian coast. Find your room, take your time, and let the day unfold.</p>
+          <a class="hero-link" href="#search" data-scroll-search>Find your coastline <span aria-hidden="true">→</span></a>
+        </div>
+        <figure class="hero-photo">
+          <img class="od-media" src="assets/vela-coast-hero.jpg" width="2000" height="1125" alt="Aerial view of a coastal resort and quiet shoreline in Maragogi, Alagoas, at golden hour">
+          <figcaption class="photo-credit">
+            <span>Maragogi, Alagoas</span>
+            <a href="https://unsplash.com/photos/an-aerial-view-of-a-beach-and-a-resort-TxRWGMujYqk" target="_blank" rel="noreferrer">Photo: Apparicio Junior / Unsplash</a>
+          </figcaption>
+        </figure>
+      </div>
+
+      <form id="search-form" class="search-panel" novalidate>
+        <div class="search-panel__heading">
+          <h2>Find your stay</h2>
+          <p>Choose a coast, then see what is open.</p>
+        </div>
+        <div class="search-grid">
+          <label class="od-field">
+            <span>Destination</span>
+            <select class="field-control" name="destination" id="destination">
+              <option value="all">Any coastline</option>
+              <option value="maragogi">Maragogi · Alagoas</option>
+              <option value="trancoso">Trancoso · Bahia</option>
+              <option value="buzios">Búzios · Rio de Janeiro</option>
+            </select>
+          </label>
+          <label class="od-field">
+            <span>Check in</span>
+            <input class="field-control" type="date" name="checkIn" id="check-in" value="2026-11-12" min="2026-09-28" required>
+          </label>
+          <label class="od-field">
+            <span>Check out</span>
+            <input class="field-control" type="date" name="checkOut" id="check-out" value="2026-11-16" min="2026-11-13" required>
+          </label>
+          <label class="od-field">
+            <span>Guests</span>
+            <select class="field-control" name="guests" id="guests">
+              <option value="1">1 guest</option>
+              <option value="2" selected>2 guests</option>
+              <option value="3">3 guests</option>
+              <option value="4">4 guests</option>
+            </select>
+          </label>
+          <button class="button button--primary" type="submit">See available stays <span aria-hidden="true">→</span></button>
+        </div>
+        <p id="search-error" class="field-error" role="alert"></p>
+      </form>
+
+      <div class="home-note">
+        <h2 class="serif">Made for a slower arrival.</h2>
+        <p>Explore a few sample coastal stays, compare room types, and follow a booking from first search to confirmation.</p>
+      </div>
+    </section>
+
+    <section class="page-view" data-view="results" aria-labelledby="results-title" hidden>
+      <div class="page-heading-row">
+        <div>
+          <p class="eyebrow">Your dates, considered</p>
+          <h1 id="results-title">Available stays</h1>
+          <p id="results-summary" class="lede"></p>
+        </div>
+        <button class="button button--quiet" type="button" data-action="edit-search">Change search</button>
+      </div>
+      <div class="results-meta">
+        <span id="result-count" aria-live="polite"></span>
+        <span>Illustrative sample rates · per room, per night</span>
+      </div>
+      <div id="hotel-results" class="hotel-grid"></div>
+    </section>
+
+    <section class="page-view" data-view="rooms" aria-labelledby="rooms-title" hidden>
+      <button class="back-link" type="button" data-action="back-results"><span aria-hidden="true">←</span> Back to available stays</button>
+      <div id="room-selection"></div>
+    </section>
+
+    <section class="page-view" data-view="booking" aria-labelledby="booking-title" hidden>
+      <button class="back-link" type="button" data-action="back-rooms"><span aria-hidden="true">←</span> Back to room selection</button>
+      <div class="view-heading">
+        <p class="eyebrow">One last detail</p>
+        <h1 id="booking-title">Your stay, in good hands.</h1>
+        <p class="lede">Add a contact name and email for this sample reservation. No account is created.</p>
+      </div>
+      <div id="booking-content"></div>
+    </section>
+
+    <section class="page-view" data-view="confirmation" aria-labelledby="confirmation-title" hidden>
+      <div id="confirmation-content"></div>
+    </section>
+
+    <section class="page-view" data-view="trips" aria-labelledby="trips-title" hidden>
+      <div class="view-heading">
+        <p class="eyebrow">Your time away</p>
+        <h1 id="trips-title">My trips</h1>
+        <p class="lede">No login required. This demo includes one sample itinerary and any booking you create in this browser session.</p>
+      </div>
+      <div id="trip-list" class="trip-list"></div>
+    </section>
+
+    <section class="page-view" data-view="staff" aria-labelledby="staff-title" hidden>
+      <div class="view-heading">
+        <p class="eyebrow">Staff workspace · demo controls</p>
+        <h1 id="staff-title">Today at Vela House</h1>
+        <p class="lede">Adjust sample room inventory and listing status. Changes are saved for this browser session only.</p>
+      </div>
+      <div id="staff-content"></div>
+    </section>
+    <p id="app-status" class="sr-only" role="status" aria-live="polite"></p>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <p>Vela House — Stay Well. Hotel names, nightly rates, room inventory, and reservations in this prototype are illustrative, not live offers.</p>
+      <p class="footer-brand">VELA HOUSE</p>
+    </div>
+  </footer>
+
+  <script>
+    (() => {
+      const originalHotels = [
+        {
+          id: "maragogi",
+          name: "Casa da Maré",
+          destination: "Maragogi",
+          region: "Alagoas",
+          description: "A quiet base beside the reef coast, with garden rooms and room to settle in.",
+          image: "assets/vela-coast-hero.jpg",
+          imageWidth: 2000,
+          imageHeight: 1125,
+          imageAlt: "Coastal resort and shoreline in Maragogi, Alagoas",
+          imageCredit: "Apparicio Junior",
+          imageCreditUrl: "https://unsplash.com/photos/an-aerial-view-of-a-beach-and-a-resort-TxRWGMujYqk",
+          active: true,
+          rooms: [
+            { id: "garden-room", name: "Garden room", detail: "King bed · garden outlook · breakfast for two", guests: 2, price: 1240, inventory: 4 },
+            { id: "reef-suite", name: "Reef-view suite", detail: "King bed · sitting area · breakfast for two", guests: 2, price: 1760, inventory: 2 },
+            { id: "two-bedroom-casa", name: "Two-bedroom casa", detail: "Two bedrooms · living room · breakfast for four", guests: 4, price: 2440, inventory: 1 }
+          ]
+        },
+        {
+          id: "trancoso",
+          name: "Casa Amana",
+          destination: "Trancoso",
+          region: "Bahia",
+          description: "A garden-side hideaway between the village square and the shore.",
+          image: "assets/coast-trancoso.jpg",
+          imageWidth: 1600,
+          imageHeight: 1067,
+          imageAlt: "Beach and ocean seen from a hill in Trancoso, Bahia",
+          imageCredit: "Mauro Lima",
+          imageCreditUrl: "https://unsplash.com/photos/a-view-of-a-beach-and-ocean-from-a-hill-zGF0mKZRsFo",
+          active: true,
+          rooms: [
+            { id: "garden-suite", name: "Garden suite", detail: "King bed · private veranda · breakfast for two", guests: 2, price: 1580, inventory: 3 },
+            { id: "terrace-suite", name: "Terrace suite", detail: "King bed · open-air lounge · breakfast for two", guests: 2, price: 2100, inventory: 2 },
+            { id: "family-casa", name: "Family casa", detail: "Two bedrooms · plunge pool · breakfast for four", guests: 4, price: 2680, inventory: 1 }
+          ]
+        },
+        {
+          id: "buzios",
+          name: "Casa do Canto",
+          destination: "Búzios",
+          region: "Rio de Janeiro",
+          description: "A small coastal stay for bay walks, long lunches, and late light.",
+          image: "assets/coast-buzios.jpg",
+          imageWidth: 1600,
+          imageHeight: 1068,
+          imageAlt: "A quiet Búzios shoreline at sunset with a single figure by the water",
+          imageCredit: "Krys Amon",
+          imageCreditUrl: "https://unsplash.com/photos/silhouette-of-person-on-seashore-during-daytime-hw-X3-fTMwU",
+          active: true,
+          rooms: [
+            { id: "courtyard-room", name: "Courtyard room", detail: "Queen bed · courtyard view · breakfast for two", guests: 2, price: 1090, inventory: 2 },
+            { id: "bay-suite", name: "Bay-view suite", detail: "King bed · balcony · breakfast for two", guests: 2, price: 1490, inventory: 2 },
+            { id: "family-house", name: "Two-bedroom house", detail: "Two bedrooms · living room · breakfast for four", guests: 4, price: 2190, inventory: 1 }
+          ]
+        }
+      ];
+
+      const sampleTrip = {
+        id: "VH-DEMO-042",
+        hotelId: "trancoso",
+        hotelName: "Casa Amana",
+        destination: "Trancoso · Bahia",
+        roomName: "Garden suite",
+        checkIn: "2026-12-03",
+        checkOut: "2026-12-06",
+        guests: 2,
+        nights: 3,
+        total: 4740,
+        guestName: "Sample itinerary",
+        guestEmail: "",
+        sample: true
+      };
+      const storageKey = "vela-house-demo-v1";
+      let stored = null;
+      try { stored = JSON.parse(sessionStorage.getItem(storageKey) || "null"); } catch (error) { stored = null; }
+      const hotels = originalHotels.map((hotel) => {
+        const savedHotel = stored && Array.isArray(stored.hotels) ? stored.hotels.find((item) => item.id === hotel.id) : null;
+        return {
+          ...hotel,
+          active: savedHotel && typeof savedHotel.active === "boolean" ? savedHotel.active : hotel.active,
+          rooms: hotel.rooms.map((room) => {
+            const savedRoom = savedHotel && Array.isArray(savedHotel.rooms) ? savedHotel.rooms.find((item) => item.id === room.id) : null;
+            const inventory = savedRoom && Number.isInteger(savedRoom.inventory) && savedRoom.inventory >= 0 && savedRoom.inventory <= 20 ? savedRoom.inventory : room.inventory;
+            return { ...room, inventory };
+          })
+        };
+      });
+      let trips = stored && Array.isArray(stored.trips) ? stored.trips : [sampleTrip];
+      if (!trips.some((trip) => trip.sample)) trips = [sampleTrip, ...trips];
+      let search = { destination: "all", checkIn: "2026-11-12", checkOut: "2026-11-16", guests: 2 };
+      let selectedHotelId = null;
+      let selectedRoomId = null;
+      let currentBooking = null;
+      const main = document.getElementById("main-content");
+      const searchForm = document.getElementById("search-form");
+      const destinationInput = document.getElementById("destination");
+      const checkInInput = document.getElementById("check-in");
+      const checkOutInput = document.getElementById("check-out");
+      const guestsInput = document.getElementById("guests");
+      const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+      const dateOptions = { month: "short", day: "numeric", timeZone: "UTC" };
+
+      function escapeHTML(value) {
+        return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
+      }
+      function formatMoney(value) { return money.format(value); }
+      function asUTCDate(value) {
+        const parts = value.split("-").map(Number);
+        return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+      }
+      function formatDate(value, includeYear) {
+        return new Intl.DateTimeFormat("en", includeYear ? { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" } : dateOptions).format(asUTCDate(value));
+      }
+      function nightCount(start, end) { return Math.max(1, Math.round((asUTCDate(end) - asUTCDate(start)) / 86400000)); }
+      function dateSummary() {
+        return formatDate(search.checkIn, true) + " – " + formatDate(search.checkOut, true) + " · " + search.guests + (search.guests === 1 ? " guest" : " guests");
+      }
+      function findHotel(id) { return hotels.find((hotel) => hotel.id === id); }
+      function findRoom(hotel, id) { return hotel ? hotel.rooms.find((room) => room.id === id) : null; }
+      function persist() {
+        try { sessionStorage.setItem(storageKey, JSON.stringify({ hotels: hotels.map((hotel) => ({ id: hotel.id, active: hotel.active, rooms: hotel.rooms.map((room) => ({ id: room.id, inventory: room.inventory })) })), trips })); } catch (error) { /* Session storage is an optional convenience. */ }
+      }
+      function setStatus(message) { document.getElementById("app-status").textContent = message; }
+      function navGroupFor(page) {
+        if (["trips"].includes(page)) return "trips";
+        if (["staff"].includes(page)) return "staff";
+        return "discover";
+      }
+      function showPage(page) {
+        document.querySelectorAll("[data-view]").forEach((view) => { view.hidden = view.dataset.view !== page; });
+        document.querySelectorAll("[data-page-target]").forEach((button) => {
+          if (button.dataset.pageTarget === navGroupFor(page)) button.setAttribute("aria-current", "page");
+          else button.removeAttribute("aria-current");
+        });
+        if (page === "results") renderResults();
+        if (page === "rooms") renderRooms();
+        if (page === "booking") renderBooking();
+        if (page === "confirmation") renderConfirmation();
+        if (page === "trips") renderTrips();
+        if (page === "staff") renderStaff();
+        window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+        main.focus({ preventScroll: true });
+      }
+      function syncSearchInputs() {
+        destinationInput.value = search.destination;
+        checkInInput.value = search.checkIn;
+        checkOutInput.value = search.checkOut;
+        guestsInput.value = String(search.guests);
+        checkOutInput.min = search.checkIn;
+      }
+      function hotelAvailableRooms(hotel) {
+        return hotel.rooms.filter((room) => room.guests >= search.guests && room.inventory > 0);
+      }
+      function renderResults() {
+        document.getElementById("results-summary").textContent = dateSummary();
+        const matches = hotels.filter((hotel) => hotel.active && (search.destination === "all" || hotel.id === search.destination) && hotelAvailableRooms(hotel).length > 0);
+        document.getElementById("result-count").textContent = matches.length + (matches.length === 1 ? " sample stay with rooms for your party" : " sample stays with rooms for your party");
+        const resultRoot = document.getElementById("hotel-results");
+        if (!matches.length) {
+          resultRoot.innerHTML = '<div class="empty-state"><h2>No stays open for these dates.</h2><p>Try another coast, fewer guests, or different dates. Staff inventory updates in this browser session can also change availability.</p><button class="button button--primary" type="button" data-action="edit-search">Adjust your search</button></div>';
+          return;
+        }
+        resultRoot.innerHTML = matches.map((hotel) => {
+          const rooms = hotelAvailableRooms(hotel);
+          const startingRate = Math.min(...rooms.map((room) => room.price));
+          const remaining = rooms.reduce((total, room) => total + room.inventory, 0);
+          return '<article class="hotel-card">' +
+            '<figure><img class="od-media" src="' + hotel.image + '" width="' + hotel.imageWidth + '" height="' + hotel.imageHeight + '" alt="' + escapeHTML(hotel.imageAlt) + '"><figcaption class="photo-credit"><span>Destination view · ' + escapeHTML(hotel.destination) + '</span><a href="' + hotel.imageCreditUrl + '" target="_blank" rel="noreferrer">Photo: ' + escapeHTML(hotel.imageCredit) + ' / Unsplash</a></figcaption></figure>' +
+            '<div class="hotel-card__body"><p class="eyebrow">' + escapeHTML(hotel.destination) + ' · ' + escapeHTML(hotel.region) + '</p><h2>' + escapeHTML(hotel.name) + '</h2><p class="hotel-card__location">Sample coastal stay</p><p class="hotel-card__description">' + escapeHTML(hotel.description) + '</p><p class="hotel-card__meta">' + rooms.length + ' room types · ' + remaining + ' rooms currently shown</p><p class="hotel-card__price"><strong>' + formatMoney(startingRate) + '</strong><span>per room / night</span></p><button class="button button--primary" type="button" data-action="choose-hotel" data-hotel-id="' + hotel.id + '">Explore rooms <span aria-hidden="true">→</span></button></div></article>';
+        }).join("");
+      }
+      function renderRooms() {
+        const hotel = findHotel(selectedHotelId);
+        const root = document.getElementById("room-selection");
+        if (!hotel) { root.innerHTML = '<div class="empty-state"><h2>Choose a stay first.</h2><p>Return to available stays to explore room options.</p><button class="button button--primary" type="button" data-action="back-results">Back to stays</button></div>'; return; }
+        const rooms = hotel.rooms.filter((room) => room.guests >= search.guests);
+        root.innerHTML = '<div class="stay-intro"><div><p class="eyebrow">' + escapeHTML(hotel.destination) + ' · ' + escapeHTML(hotel.region) + '</p><h1 id="rooms-title">' + escapeHTML(hotel.name) + '</h1><p>' + escapeHTML(hotel.description) + '</p><p class="lede">' + dateSummary() + ' · ' + nightCount(search.checkIn, search.checkOut) + (nightCount(search.checkIn, search.checkOut) === 1 ? ' night' : ' nights') + '</p></div><figure><img class="od-media" src="' + hotel.image + '" width="' + hotel.imageWidth + '" height="' + hotel.imageHeight + '" alt="' + escapeHTML(hotel.imageAlt) + '"><figcaption class="photo-credit"><span>Destination view · ' + escapeHTML(hotel.destination) + '</span><a href="' + hotel.imageCreditUrl + '" target="_blank" rel="noreferrer">Photo: ' + escapeHTML(hotel.imageCredit) + ' / Unsplash</a></figcaption></figure></div>' +
+          '<div class="view-heading"><p class="eyebrow">Room selection</p><h2 class="serif">Choose your room</h2><p class="lede">Rates are shown per room, per night. Availability is sample inventory.</p></div>' +
+          (rooms.length ? '<div class="room-list">' + rooms.map((room) => {
+            const unavailable = room.inventory < 1;
+            return '<article class="room-row"><div><h2>' + escapeHTML(room.name) + '</h2><p>' + escapeHTML(room.detail) + ' · up to ' + room.guests + (room.guests === 1 ? ' guest' : ' guests') + '</p><span class="room-row__availability">' + (unavailable ? 'Sold out in this demo' : room.inventory + (room.inventory === 1 ? ' room shown' : ' rooms shown')) + '</span></div><div class="room-row__rate"><strong>' + formatMoney(room.price) + '</strong><span>per room / night</span></div><button class="button ' + (unavailable ? 'button--quiet' : 'button--primary') + '" type="button" data-action="choose-room" data-room-id="' + room.id + '" ' + (unavailable ? 'disabled' : '') + '>Reserve room</button></article>';
+          }).join('') + '</div>' : '<div class="empty-state"><h2>No room fits this party size.</h2><p>Change guest count to see other room types for this stay.</p><button class="button button--quiet" type="button" data-action="edit-search">Change search</button></div>');
+      }
+      function bookingTotal(room) { return room.price * nightCount(search.checkIn, search.checkOut); }
+      function renderBooking() {
+        const hotel = findHotel(selectedHotelId);
+        const room = findRoom(hotel, selectedRoomId);
+        const root = document.getElementById("booking-content");
+        if (!hotel || !room) { root.innerHTML = '<div class="empty-state"><h2>Select a room first.</h2><p>Choose an available room before entering guest details.</p><button class="button button--primary" type="button" data-action="back-results">View available stays</button></div>'; return; }
+        const nights = nightCount(search.checkIn, search.checkOut);
+        root.innerHTML = '<div class="booking-layout"><form id="guest-form" class="form-panel"><h2>Guest details</h2><div class="guest-fields"><label class="od-field"><span>Full name</span><input class="field-control" type="text" name="guestName" autocomplete="name" required></label><label class="od-field"><span>Email address</span><input class="field-control" type="email" name="guestEmail" autocomplete="email" required></label></div><p class="form-help">Your details stay in this browser demo. There is no account or payment step.</p><button class="button button--primary" type="submit">Confirm sample booking</button></form><aside class="summary-panel" aria-label="Stay summary"><h2>Stay summary</h2><p class="summary-hotel">' + escapeHTML(hotel.name) + '</p><p class="summary-room">' + escapeHTML(room.name) + '</p><div class="summary-line"><span>Dates</span><strong>' + formatDate(search.checkIn, true) + ' – ' + formatDate(search.checkOut, true) + '</strong></div><div class="summary-line"><span>Guests</span><strong>' + search.guests + (search.guests === 1 ? ' guest' : ' guests') + '</strong></div><div class="summary-line"><span>Nightly rate</span><strong>' + formatMoney(room.price) + '</strong></div><div class="summary-line"><span>Stay length</span><strong>' + nights + (nights === 1 ? ' night' : ' nights') + '</strong></div><div class="summary-line summary-total"><span>Sample total</span><strong>' + formatMoney(bookingTotal(room)) + '</strong></div></aside></div>';
+      }
+      function renderConfirmation() {
+        const root = document.getElementById("confirmation-content");
+        if (!currentBooking) { root.innerHTML = '<div class="empty-state"><h2>No new booking to show.</h2><p>Start with a destination search to create a sample reservation.</p><button class="button button--primary" type="button" data-action="go-home">Find a stay</button></div>'; return; }
+        root.innerHTML = '<div class="confirmation-panel"><div class="confirmation-mark" aria-hidden="true">✓</div><p class="eyebrow">Sample booking confirmed</p><h1 id="confirmation-title">You are going to ' + escapeHTML(currentBooking.destination.split(' · ')[0]) + '.</h1><p>Your stay is saved in My trips for this browser session. This is a prototype confirmation; no hotel has been booked.</p><span class="confirmation-code">' + escapeHTML(currentBooking.id) + '</span><div class="confirmation-summary"><p><strong>' + escapeHTML(currentBooking.hotelName) + '</strong></p><p>' + escapeHTML(currentBooking.roomName) + '</p><p>' + formatDate(currentBooking.checkIn, true) + ' – ' + formatDate(currentBooking.checkOut, true) + ' · ' + currentBooking.guests + (currentBooking.guests === 1 ? ' guest' : ' guests') + '</p><p><strong>' + formatMoney(currentBooking.total) + '</strong> sample total</p></div><div class="confirmation-actions"><button class="button button--primary" type="button" data-action="go-trips">View My trips</button><button class="button button--quiet" type="button" data-action="go-home">Find another stay</button></div></div>';
+      }
+      function renderTrips() {
+        const root = document.getElementById("trip-list");
+        const sorted = trips.slice().sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+        if (!sorted.length) { root.innerHTML = '<div class="empty-state"><h2>Your next coast is waiting.</h2><p>When you create a sample booking, it will appear here.</p><button class="button button--primary" type="button" data-action="go-home">Find a stay</button></div>'; return; }
+        root.innerHTML = sorted.map((trip) => '<article class="trip-card"><div class="trip-card__top"><div><p class="eyebrow">' + (trip.sample ? 'Sample itinerary' : 'Browser demo booking') + '</p><h2>' + escapeHTML(trip.hotelName) + '</h2><p class="trip-card__location">' + escapeHTML(trip.destination) + '</p></div><span class="trip-tag">' + (trip.sample ? 'SAMPLE' : 'CONFIRMED · DEMO') + '</span></div><div class="trip-details"><p><span>Arrive</span><strong>' + formatDate(trip.checkIn, true) + '</strong></p><p><span>Depart</span><strong>' + formatDate(trip.checkOut, true) + '</strong></p><p><span>Room</span><strong>' + escapeHTML(trip.roomName) + '</strong></p><p><span>Guests</span><strong>' + trip.guests + (trip.guests === 1 ? ' guest' : ' guests') + '</strong></p></div><div class="trip-card__foot"><p>Reference ' + escapeHTML(trip.id) + '</p><p><strong>' + formatMoney(trip.total) + '</strong> sample total</p></div></article>').join("");
+      }
+      function renderStaff() {
+        const root = document.getElementById("staff-content");
+        const activeCount = hotels.filter((hotel) => hotel.active).length;
+        const roomCount = hotels.reduce((total, hotel) => total + hotel.rooms.reduce((sum, room) => sum + room.inventory, 0), 0);
+        root.innerHTML = '<div class="staff-summary"><div class="staff-stat"><strong>' + activeCount + ' / ' + hotels.length + '</strong><span>sample listings active</span></div><div class="staff-stat"><strong>' + roomCount + '</strong><span>rooms shown in inventory</span></div><div class="staff-stat"><strong>' + trips.length + '</strong><span>sample reservations</span></div></div><section class="staff-section" aria-labelledby="inventory-title"><p class="eyebrow">Inventory</p><h2 id="inventory-title">Room availability</h2><div class="inventory-list">' + hotels.map((hotel) => '<div class="inventory-row"><div><h3>' + escapeHTML(hotel.name) + '</h3><p>' + escapeHTML(hotel.destination) + ' · ' + escapeHTML(hotel.region) + (hotel.active ? ' · Listing active' : ' · Listing paused') + '</p></div><div><span class="inventory-count">' + hotel.rooms.reduce((sum, room) => sum + room.inventory, 0) + ' rooms</span><p>' + hotel.rooms.length + ' sample room types</p></div><button class="button button--small listing-control ' + (hotel.active ? 'button--quiet' : 'button--primary') + '" type="button" data-action="toggle-listing" data-hotel-id="' + hotel.id + '">' + (hotel.active ? 'Pause listing' : 'Resume listing') + '</button>' + hotel.rooms.map((room) => '<div class="inventory-room"><p><strong>' + escapeHTML(room.name) + '</strong><span> · ' + escapeHTML(hotel.name) + '</span></p></div><div class="inventory-room"><p>' + formatMoney(room.price) + ' / night · up to ' + room.guests + (room.guests === 1 ? ' guest' : ' guests') + '</p></div><div class="inventory-controls"><button class="count-button" type="button" data-action="stock-down" data-hotel-id="' + hotel.id + '" data-room-id="' + room.id + '" aria-label="Decrease ' + escapeHTML(room.name) + ' inventory at ' + escapeHTML(hotel.name) + '" ' + (room.inventory === 0 ? 'disabled' : '') + '>−</button><span class="inventory-count" aria-live="polite">' + room.inventory + '</span><button class="count-button" type="button" data-action="stock-up" data-hotel-id="' + hotel.id + '" data-room-id="' + room.id + '" aria-label="Increase ' + escapeHTML(room.name) + ' inventory at ' + escapeHTML(hotel.name) + '" ' + (room.inventory >= 20 ? 'disabled' : '') + '>+</button></div>').join("")).join("") + '</div></section><section class="staff-section" aria-labelledby="reservations-title"><p class="eyebrow">Bookings</p><h2 id="reservations-title">Recent reservations</h2><div class="reservation-list">' + trips.slice().sort((a, b) => b.checkIn.localeCompare(a.checkIn)).map((trip) => '<article class="reservation-row"><div><h3>' + escapeHTML(trip.hotelName) + '</h3><p>' + escapeHTML(trip.guestName || 'Guest') + ' · ' + escapeHTML(trip.roomName) + ' · ' + formatDate(trip.checkIn, true) + '</p></div><span class="trip-tag">' + (trip.sample ? 'SAMPLE' : 'DEMO CONFIRMED') + '</span><strong>' + formatMoney(trip.total) + '</strong></article>').join("") + '</div></section>';
+      }
+      function openRooms(hotelId) {
+        selectedHotelId = hotelId;
+        selectedRoomId = null;
+        showPage("rooms");
+      }
+      function createBooking(form) {
+        const hotel = findHotel(selectedHotelId);
+        const room = findRoom(hotel, selectedRoomId);
+        if (!hotel || !room || room.inventory < 1 || !hotel.active) {
+          setStatus("That room is no longer available in this sample inventory. Choose another room.");
+          showPage("rooms");
+          return;
+        }
+        const name = form.elements.guestName.value.trim();
+        const email = form.elements.guestEmail.value.trim();
+        if (!name || !email) return;
+        const nights = nightCount(search.checkIn, search.checkOut);
+        const id = "VH-" + Date.now().toString().slice(-7);
+        currentBooking = {
+          id,
+          hotelId: hotel.id,
+          hotelName: hotel.name,
+          destination: hotel.destination + " · " + hotel.region,
+          roomName: room.name,
+          checkIn: search.checkIn,
+          checkOut: search.checkOut,
+          guests: search.guests,
+          nights,
+          total: room.price * nights,
+          guestName: name,
+          guestEmail: email,
+          sample: false
+        };
+        room.inventory = Math.max(0, room.inventory - 1);
+        trips.unshift(currentBooking);
+        persist();
+        showPage("confirmation");
+        setStatus("Sample booking confirmed. The trip is now listed in My trips.");
+      }
+
+      document.querySelectorAll("[data-page-target]").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          showPage(button.dataset.pageTarget);
+        });
+      });
+      document.querySelector("[data-scroll-search]").addEventListener("click", (event) => {
+        event.preventDefault();
+        document.getElementById("search").scrollIntoView({ behavior: "smooth", block: "center" });
+        destinationInput.focus({ preventScroll: true });
+      });
+      searchForm.id = "search";
+      checkInInput.addEventListener("change", () => { checkOutInput.min = checkInInput.value; });
+      searchForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const message = document.getElementById("search-error");
+        message.textContent = "";
+        if (!checkInInput.value || !checkOutInput.value || checkOutInput.value <= checkInInput.value) {
+          message.textContent = "Choose a check-out date after your check-in date.";
+          checkOutInput.focus();
+          return;
+        }
+        search = {
+          destination: destinationInput.value,
+          checkIn: checkInInput.value,
+          checkOut: checkOutInput.value,
+          guests: Number(guestsInput.value)
+        };
+        showPage("results");
+      });
+      main.addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-action]");
+        if (!button || button.disabled) return;
+        const action = button.dataset.action;
+        if (action === "edit-search") { syncSearchInputs(); showPage("discover"); destinationInput.focus({ preventScroll: true }); }
+        if (action === "choose-hotel") openRooms(button.dataset.hotelId);
+        if (action === "back-results") showPage("results");
+        if (action === "back-rooms") showPage("rooms");
+        if (action === "choose-room") { selectedRoomId = button.dataset.roomId; showPage("booking"); }
+        if (action === "go-home") showPage("discover");
+        if (action === "go-trips") showPage("trips");
+        if (action === "toggle-listing") {
+          const hotel = findHotel(button.dataset.hotelId);
+          if (hotel) { hotel.active = !hotel.active; persist(); renderStaff(); setStatus(hotel.name + " listing " + (hotel.active ? "resumed." : "paused.")); }
+        }
+        if (action === "stock-down" || action === "stock-up") {
+          const hotel = findHotel(button.dataset.hotelId);
+          const room = findRoom(hotel, button.dataset.roomId);
+          if (room) {
+            room.inventory = Math.min(20, Math.max(0, room.inventory + (action === "stock-up" ? 1 : -1)));
+            persist();
+            renderStaff();
+            setStatus(room.name + " inventory is now " + room.inventory + ".");
+          }
+        }
+      });
+      main.addEventListener("submit", (event) => {
+        if (event.target.id !== "guest-form") return;
+        event.preventDefault();
+        if (!event.target.reportValidity()) return;
+        createBooking(event.target);
+      });
+      syncSearchInputs();
+    })();
+  </script>
+</body>
+</html>

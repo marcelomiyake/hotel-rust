@@ -1,0 +1,36 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/hotel-common",
+  "services/hotel-service",
+  "services/rate-service",
+  "services/reservation-service",
+  "services/payment-service",
+  "services/management-service",
+]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+rust-version = "1.98"
+version = "0.1.0"
+
+[workspace.dependencies]
+axum = { version = "0.8", features = ["macros"] }
+chrono = { version = "0.4", features = ["serde"] }
+dotenvy = "0.15"
+hotel-common = { path = "crates/hotel-common" }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "migrate", "macros"] }
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal", "time"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+uuid = { version = "1", features = ["serde", "v4"] }
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+strip = true

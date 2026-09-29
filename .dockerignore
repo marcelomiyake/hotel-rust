@@ -1,0 +1,8 @@
+target
+web/node_modules
+web/dist
+web/coverage
+.git
+.env
+reports
+docs/screenshot.png

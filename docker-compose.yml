@@ -1,0 +1,102 @@
+name: hotel-reservation
+services:
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - "127.0.0.1:55433:5432"
+    environment:
+      POSTGRES_USER: hotel
+      POSTGRES_PASSWORD: hotel
+      POSTGRES_DB: hotel_service
+    volumes:
+      - hotel-postgres:/var/lib/postgresql/data
+      - ./deploy/postgres/init-databases.sh:/docker-entrypoint-initdb.d/10-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hotel -d hotel_service"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  hotel-service:
+    build:
+      context: .
+      args:
+        SERVICE: hotel-service
+    environment:
+      DATABASE_URL: postgres://hotel:hotel@postgres:5432/hotel_service
+      STAFF_TOKEN: ${STAFF_TOKEN:-local-staff-token-change-me}
+      RUST_LOG: info
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  rate-service:
+    build:
+      context: .
+      args:
+        SERVICE: rate-service
+    environment:
+      DATABASE_URL: postgres://hotel:hotel@postgres:5432/rate_service
+      STAFF_TOKEN: ${STAFF_TOKEN:-local-staff-token-change-me}
+      RUST_LOG: info
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  reservation-service:
+    build:
+      context: .
+      args:
+        SERVICE: reservation-service
+    environment:
+      DATABASE_URL: postgres://hotel:hotel@postgres:5432/reservation_service
+      RATE_SERVICE_URL: http://rate-service:8080
+      PAYMENT_SERVICE_URL: http://payment-service:8080
+      STAFF_TOKEN: ${STAFF_TOKEN:-local-staff-token-change-me}
+      RUST_LOG: info
+    depends_on:
+      postgres: { condition: service_healthy }
+      rate-service: { condition: service_started }
+      payment-service: { condition: service_started }
+
+  payment-service:
+    build:
+      context: .
+      args:
+        SERVICE: payment-service
+    environment:
+      DATABASE_URL: postgres://hotel:hotel@postgres:5432/payment_service
+      STAFF_TOKEN: ${STAFF_TOKEN:-local-staff-token-change-me}
+      RUST_LOG: info
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  management-service:
+    build:
+      context: .
+      args:
+        SERVICE: management-service
+    environment:
+      HOTEL_SERVICE_URL: http://hotel-service:8080
+      RATE_SERVICE_URL: http://rate-service:8080
+      RESERVATION_SERVICE_URL: http://reservation-service:8080
+      PAYMENT_SERVICE_URL: http://payment-service:8080
+      STAFF_TOKEN: ${STAFF_TOKEN:-local-staff-token-change-me}
+      RUST_LOG: info
+    depends_on:
+      hotel-service: { condition: service_started }
+      rate-service: { condition: service_started }
+      reservation-service: { condition: service_started }
+      payment-service: { condition: service_started }
+
+  web:
+    build:
+      context: ./web
+    ports:
+      - "127.0.0.1:8088:80"
+    depends_on:
+      hotel-service: { condition: service_started }
+      rate-service: { condition: service_started }
+      reservation-service: { condition: service_started }
+      management-service: { condition: service_started }
+
+volumes:
+  hotel-postgres:

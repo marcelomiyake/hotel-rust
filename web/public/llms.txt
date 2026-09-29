@@ -1,0 +1,6 @@
+# Vela House
+
+> A small collection of considered coastal stays in Brazil. Guests can search availability, compare nightly rates, make reservations, and look up or cancel their trips.
+
+## Website
+- [Browse Vela House stays](/)

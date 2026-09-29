@@ -1,0 +1,49 @@
+name: SonarCloud quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sonarcloud-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
+
+      - uses: actions/setup-node@v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install analysis tools
+        run: |
+          cargo install cargo-llvm-cov --version 0.9.1 --locked
+          cargo install cargo-sonar-scanner --version 1.0.0 --locked
+
+      - name: Start PostgreSQL test databases
+        run: docker compose up -d --wait postgres
+
+      - name: Analyze all monorepo projects
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: ./scripts/sonar-analyze.sh
+
+      - name: Stop PostgreSQL
+        if: always()
+        run: docker compose down --volumes

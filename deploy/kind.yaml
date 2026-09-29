@@ -1,0 +1,342 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hotel-rust
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hotel-secrets
+  namespace: hotel-rust
+type: Opaque
+stringData:
+  POSTGRES_USER: hotel
+  POSTGRES_PASSWORD: local-kind-password
+  STAFF_TOKEN: local-kind-staff-token-change-me
+  HOTEL_DATABASE_URL: postgres://hotel:local-kind-password@postgres:5432/hotel_service
+  RATE_DATABASE_URL: postgres://hotel:local-kind-password@postgres:5432/rate_service
+  RESERVATION_DATABASE_URL: postgres://hotel:local-kind-password@postgres:5432/reservation_service
+  PAYMENT_DATABASE_URL: postgres://hotel:local-kind-password@postgres:5432/payment_service
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: hotel-rust
+data:
+  init-databases.sh: |
+    #!/bin/sh
+    set -eu
+    for database in hotel_service rate_service reservation_service payment_service hotel_service_test rate_service_test reservation_service_test payment_service_test; do
+      if ! psql --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --tuples-only --no-align --command "SELECT 1 FROM pg_database WHERE datname = '$database'" | grep -q 1; then
+        createdb --username "$POSTGRES_USER" "$database"
+      fi
+    done
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: hotel-rust
+spec:
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: hotel-rust
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: hotel-secrets, key: POSTGRES_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: hotel-secrets, key: POSTGRES_PASSWORD } }
+            - name: POSTGRES_DB
+              value: hotel_service
+          ports:
+            - name: postgres
+              containerPort: 5432
+          readinessProbe:
+            exec: { command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""] }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec: { command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""] }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          volumeMounts:
+            - name: pg-data
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-init
+              mountPath: /docker-entrypoint-initdb.d/10-databases.sh
+              subPath: init-databases.sh
+              readOnly: true
+      volumes:
+        - name: postgres-init
+          configMap:
+            name: postgres-init
+            defaultMode: 365
+  volumeClaimTemplates:
+    - metadata:
+        name: pg-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hotel-service
+  namespace: hotel-rust
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: hotel-service }
+  template:
+    metadata:
+      labels: { app: hotel-service }
+    spec:
+      containers:
+        - name: hotel-service
+          image: hotel-service:local
+          imagePullPolicy: Never
+          env:
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: hotel-secrets, key: HOTEL_DATABASE_URL } }
+            - name: STAFF_TOKEN
+              valueFrom: { secretKeyRef: { name: hotel-secrets, key: STAFF_TOKEN } }
+            - name: RUST_LOG
+              value: info
+          ports: [{ name: http, containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, initialDelaySeconds: 10, periodSeconds: 10 }
+          resources: { requests: { cpu: 50m, memory: 64Mi }, limits: { cpu: 500m, memory: 256Mi } }
+          securityContext: { runAsNonRoot: true, runAsUser: 10001, allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hotel-service
+  namespace: hotel-rust
+spec:
+  selector: { app: hotel-service }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rate-service
+  namespace: hotel-rust
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: rate-service }
+  template:
+    metadata:
+      labels: { app: rate-service }
+    spec:
+      containers:
+        - name: rate-service
+          image: rate-service:local
+          imagePullPolicy: Never
+          env:
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: hotel-secrets, key: RATE_DATABASE_URL } }
+            - name: STAFF_TOKEN
+              valueFrom: { secretKeyRef: { name: hotel-secrets, key: STAFF_TOKEN } }
+            - name: RUST_LOG
+              value: info
+          ports: [{ name: http, containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, initialDelaySeconds: 10, periodSeconds: 10 }
+          resources: { requests: { cpu: 50m, memory: 64Mi }, limits: { cpu: 500m, memory: 256Mi } }
+          securityContext: { runAsNonRoot: true, runAsUser: 10001, allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rate-service
+  namespace: hotel-rust
+spec:
+  selector: { app: rate-service }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: hotel-rust
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: payment-service }
+  template:
+    metadata:
+      labels: { app: payment-service }
+    spec:
+      containers:
+        - name: payment-service
+          image: payment-service:local
+          imagePullPolicy: Never
+          env:
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: hotel-secrets, key: PAYMENT_DATABASE_URL } }
+            - name: STAFF_TOKEN
+              valueFrom: { secretKeyRef: { name: hotel-secrets, key: STAFF_TOKEN } }
+            - name: RUST_LOG
+              value: info
+          ports: [{ name: http, containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, initialDelaySeconds: 10, periodSeconds: 10 }
+          resources: { requests: { cpu: 50m, memory: 64Mi }, limits: { cpu: 500m, memory: 256Mi } }
+          securityContext: { runAsNonRoot: true, runAsUser: 10001, allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service
+  namespace: hotel-rust
+spec:
+  selector: { app: payment-service }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reservation-service
+  namespace: hotel-rust
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: reservation-service }
+  template:
+    metadata:
+      labels: { app: reservation-service }
+    spec:
+      containers:
+        - name: reservation-service
+          image: reservation-service:local
+          imagePullPolicy: Never
+          env:
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: hotel-secrets, key: RESERVATION_DATABASE_URL } }
+            - name: RATE_SERVICE_URL
+              value: http://rate-service:8080
+            - name: PAYMENT_SERVICE_URL
+              value: http://payment-service:8080
+            - name: STAFF_TOKEN
+              valueFrom: { secretKeyRef: { name: hotel-secrets, key: STAFF_TOKEN } }
+            - name: RUST_LOG
+              value: info
+          ports: [{ name: http, containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, initialDelaySeconds: 10, periodSeconds: 10 }
+          resources: { requests: { cpu: 75m, memory: 80Mi }, limits: { cpu: 750m, memory: 320Mi } }
+          securityContext: { runAsNonRoot: true, runAsUser: 10001, allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reservation-service
+  namespace: hotel-rust
+spec:
+  selector: { app: reservation-service }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: management-service
+  namespace: hotel-rust
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: management-service }
+  template:
+    metadata:
+      labels: { app: management-service }
+    spec:
+      containers:
+        - name: management-service
+          image: management-service:local
+          imagePullPolicy: Never
+          env:
+            - name: HOTEL_SERVICE_URL
+              value: http://hotel-service:8080
+            - name: RATE_SERVICE_URL
+              value: http://rate-service:8080
+            - name: RESERVATION_SERVICE_URL
+              value: http://reservation-service:8080
+            - name: PAYMENT_SERVICE_URL
+              value: http://payment-service:8080
+            - name: STAFF_TOKEN
+              valueFrom: { secretKeyRef: { name: hotel-secrets, key: STAFF_TOKEN } }
+            - name: RUST_LOG
+              value: info
+          ports: [{ name: http, containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, initialDelaySeconds: 10, periodSeconds: 10 }
+          resources: { requests: { cpu: 50m, memory: 64Mi }, limits: { cpu: 500m, memory: 256Mi } }
+          securityContext: { runAsNonRoot: true, runAsUser: 10001, allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: management-service
+  namespace: hotel-rust
+spec:
+  selector: { app: management-service }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hotel-web
+  namespace: hotel-rust
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: hotel-web }
+  template:
+    metadata:
+      labels: { app: hotel-web }
+    spec:
+      containers:
+        - name: web
+          image: hotel-web:local
+          imagePullPolicy: Never
+          ports: [{ name: http, containerPort: 80 }]
+          readinessProbe: { httpGet: { path: /, port: http }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /, port: http }, initialDelaySeconds: 10, periodSeconds: 10 }
+          resources: { requests: { cpu: 25m, memory: 32Mi }, limits: { cpu: 250m, memory: 128Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hotel-web
+  namespace: hotel-rust
+spec:
+  selector: { app: hotel-web }
+  ports: [{ name: http, port: 80, targetPort: http }]
