@@ -90,12 +90,12 @@ The GitHub Actions workflow is in `.github/workflows/sonarcloud.yml`; add a repo
 
 ## Lighthouse and search metadata
 
-Lighthouse 13.5.0 was run against the Kind deployment on 2026-09-28. Scores below are the observed local results. Lighthouse's Agentic Browsing category is experimental; its scoring is described in [Chrome's Lighthouse documentation](https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring).
+Lighthouse 13.5.0 was run against the Compose deployment on 2026-10-01. Scores below are the observed local results. Lighthouse's Agentic Browsing category is experimental; its scoring is described in [Chrome's Lighthouse documentation](https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring).
 
 | Form factor | Performance | Accessibility | Best Practices | SEO | Agentic Browsing |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Desktop | 100 | 100 | 100 | 100 | 100 |
-| Mobile | 99 | 100 | 100 | 100 | 100 |
+| Mobile | 100 | 100 | 100 | 100 | 100 |
 
 The frontend has page titles, description and social metadata, structured organization data, `robots.txt`, and `llms.txt`. Image sizes and responsive WebP sources are set to keep the initial page light.
 
@@ -108,8 +108,8 @@ The frontend has page titles, description and social metadata, structured organi
 - Five Rust services, one shared Rust crate, a React 19.3 application, PostgreSQL migrations, Docker Compose, and Kind manifests.
 - Kind verification: all six deployments were ready at 2/2 replicas; PostgreSQL was ready at 1/1.
 - Rust test suite: 34 tests passed across the six packages.
-- Frontend: `npm run check`, `npm run test:coverage` (19 tests), and `npm run build` passed. Vitest reported 96.78% line coverage; SonarCloud's configured frontend source scope reports 91.7%.
-- Lighthouse: desktop all five categories 100; mobile 99 Performance and 100 in the remaining categories.
+- Frontend: `npm run check`, `npm run test:coverage` (19 tests), and `npm run build` passed. Vitest reported 96.44% line coverage; SonarCloud's configured frontend source scope reports 91.8%.
+- Lighthouse: all five categories scored 100 on both desktop and mobile.
 - Source/configuration size: **6,839 nonblank LOC across 56 files**, counted on 2026-09-28. The count includes `.rs`, `.ts`, `.tsx`, `.css`, `.html`, `.sql`, `.sh`, `.toml`, `.yaml`, `.yml`, `.json`, `.conf`, and `.svg` files; excludes lockfiles, generated/build/dependency directories, and the OpenDesign prototype/assets.
 
 ### Harness and token usage
@@ -161,18 +161,20 @@ ORDER BY last_activity_at DESC;
 
 ### Change and quality statistics
 
-The feature implementation commit, [`c747869`](https://github.com/marcelomiyake/hotel-rust/commit/c747869746c8b321ce23d9180d80599c7447242b), changed seven files: one SQL migration was created, six existing code, configuration, and test files were changed, and no files were deleted. Its Git diff contains **476 inserted lines and 27 removed lines** (net +449). The new migration creates two tables, two indexes, and the abandonment view.
+The analytics implementation commit, [`c747869`](https://github.com/marcelomiyake/hotel-rust/commit/c747869746c8b321ce23d9180d80599c7447242b), changed seven files: one SQL migration was created, six existing code, configuration, and test files were changed, and no files were deleted. Its Git diff contains **476 inserted lines and 27 removed lines** (net +449). The new migration creates two tables, two indexes, and the abandonment view.
 
-Across the feature and this README report, the branch diff changes eight files: one created, seven modified, and none deleted, with **542 inserted lines and 29 removed lines** (net +513).
+The web performance pass adds prerendered HTML for the home page, embeds its stylesheet in the page, and loads the trips and host tools on demand. It creates four source files and changes three existing files, with no file deletions.
 
-The current source/configuration inventory is **7,264 nonblank LOC across 57 files**, excluding this README, lockfiles, generated/build/dependency directories, and the OpenDesign prototype/assets. The count covers `.rs`, `.ts`, `.tsx`, `.css`, `.html`, `.sql`, `.sh`, `.toml`, `.yaml`, `.yml`, `.json`, `.conf`, and `.svg` files.
+Across the analytics implementation, web performance pass, and this README report, the diff changes **14 files**: five created, nine modified, and none deleted, with **740 inserted lines and 177 removed lines** (net +563).
+
+The current source/configuration inventory is **7,306 nonblank LOC across 61 files**, excluding this README, lockfiles, generated/build/dependency directories, and the OpenDesign prototype/assets. The count covers `.rs`, `.ts`, `.tsx`, `.mjs`, `.css`, `.html`, `.sql`, `.sh`, `.toml`, `.yaml`, `.yml`, `.json`, `.conf`, and `.svg` files.
 
 | Check | Result |
 | --- | ---: |
 | Rust workspace tests | 34 passed |
 | Frontend tests | 19 passed |
 | Frontend Vitest line coverage | 96.42% |
-| Frontend SonarCloud coverage | 91.7% |
+| Frontend SonarCloud coverage | 91.8% |
 | Reservation service SonarCloud coverage | 96.5% |
 | SonarCloud open issues across all seven projects | 0 |
 | SonarCloud bugs, vulnerabilities, and code smells across all seven projects | 0 |
@@ -180,22 +182,23 @@ The current source/configuration inventory is **7,264 nonblank LOC across 57 fil
 
 All six Rust packages passed the repository's `cargo llvm-cov --fail-under-lines 80` checks. The TypeScript check, frontend coverage run, and production build passed. The live Compose smoke check confirmed that Nginx forwards journey events and that a `payment` screen checkpoint is stored in PostgreSQL.
 
-Lighthouse 13.5.0 on the Compose deployment scored **100** in desktop Performance, Accessibility, Best Practices, and SEO. Mobile scored **99** in Performance and **100** in Accessibility, Best Practices, and SEO. The page's SEO META checks scored 100 on both form factors. The brand link accessible name was adjusted to include its visible text.
+Lighthouse 13.5.0 on the Compose deployment scored **100 in all five categories** on desktop and mobile, including Performance, Accessibility, Best Practices, SEO, and Agentic Browsing. The page's SEO META checks scored 100 on both form factors. Repeated mobile runs scored 100 Performance; Lighthouse reported no browser-console errors. The homepage is prerendered into HTML, its CSS is inline to remove the render-blocking stylesheet request, and the trips and host screens load as separate on-demand chunks.
 
 ### Harness and token cost for this feature session
 
-Harness: **Codex, GPT-6 Luna (`gpt-6-luna`), max effort**. The session and cache were empty before the task began, as specified in the prompt. The counters below are the cumulative Codex session-log snapshot at 2026-10-01 17:58 UTC; cached input is included in input, and reasoning is included in output.
+Harness: **Codex, GPT-6 Luna (`gpt-6-luna`), max effort**. The session and cache were empty before the task began, as specified in the prompt. These are cumulative Codex session-log counters captured at 2026-10-01 18:20 UTC before final README editing and the final Git operations; cached input is included in input, and reasoning is included in output.
 
 | Counter | Tokens | Notes |
 | --- | ---: | --- |
-| Input | 14,112,819 | Includes cached input below |
-| Cached input | 13,818,624 | Subset of input |
-| Uncached input | 294,195 | Input less cached input |
-| Output | 101,151 | Includes reasoning below |
-| Reasoning | 73,774 | Subset of output; not counted twice |
+| Input | 20,495,593 | Includes cached input below |
+| Cached input | 20,061,184 | Subset of input |
+| Uncached input | 434,409 | Input less cached input |
+| Output | 142,242 | Includes reasoning below |
+| Reasoning | 100,798 | Subset of output; not counted twice |
+| Total input + output | 20,637,835 | |
 | Cache writes | 0 | |
 
-The [official OpenAI API pricing](https://developers.openai.com/api/docs/pricing?tab=suite), checked on 2026-10-01, lists standard GPT-6 Luna rates of $0.10/M uncached input, $0.01/M cached input, and $0.50/M output tokens. Using those rates, the API-equivalent estimate is **$0.21818124 USD** (about **$0.22**): $0.02941950 uncached input + $0.13818624 cached input + $0.05057550 output. Reasoning tokens use the output rate and are already included in output. This is a token-based API equivalent, not the Codex subscription charge.
+The [official GPT-6 Luna model page](https://developers.openai.com/api/docs/models/gpt-6-luna) and [OpenAI API pricing](https://developers.openai.com/api/docs/pricing?tab=suite), checked on 2026-10-01, list standard rates of $0.10/M uncached input, $0.01/M cached input, and $0.50/M output tokens. Using those rates, the API-equivalent estimate is **$0.31517374 USD** (about **$0.32**): $0.04344090 uncached input + $0.20061184 cached input + $0.07112100 output. Reasoning tokens use the output rate and are already included in output. This is a token-based API equivalent, not the Codex subscription charge.
 
 <details>
 <summary>Full prompt analyzed for this feature</summary>
