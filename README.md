@@ -188,6 +188,8 @@ Lighthouse 13.5.0 on the Compose deployment scored **100 in all five categories*
 
 Harness: **Codex, GPT-6 Luna (`gpt-6-luna`), max effort**. The session and cache were empty before the task began, as specified in the prompt. These are cumulative Codex session-log counters captured at 2026-10-01 18:20 UTC before final README editing and the final Git operations; cached input is included in input, and reasoning is included in output.
 
+Worked for **1h 13m 39s**.
+
 | Counter | Tokens | Notes |
 | --- | ---: | --- |
 | Input | 20,495,593 | Includes cached input below |
