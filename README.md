@@ -73,13 +73,13 @@ Rust tests exercise request validation, booking and cancellation behavior, idemp
 | --- | ---: | ---: |
 | [hotel-service](https://sonarcloud.io/project/overview?id=marcelomiyake_hotel-rust_hotel-service) | 99.5% | 0 |
 | [rate-service](https://sonarcloud.io/project/overview?id=marcelomiyake_hotel-rust_rate-service) | 100.0% | 0 |
-| [reservation-service](https://sonarcloud.io/project/overview?id=marcelomiyake_hotel-rust_reservation-service) | 96.1% | 0 |
+| [reservation-service](https://sonarcloud.io/project/overview?id=marcelomiyake_hotel-rust_reservation-service) | 96.5% | 0 |
 | [payment-service](https://sonarcloud.io/project/overview?id=marcelomiyake_hotel-rust_payment-service) | 99.5% | 0 |
 | [management-service](https://sonarcloud.io/project/overview?id=marcelomiyake_hotel-rust_management-service) | 99.2% | 0 |
 | [hotel-common](https://sonarcloud.io/project/overview?id=marcelomiyake_hotel-rust_hotel-common) | 91.0% | 0 |
 | [web](https://sonarcloud.io/project/overview?id=marcelomiyake_hotel-rust_web) | 91.7% | 0 |
 
-All seven [SonarCloud monorepo projects](https://sonarcloud.io/organizations/marcelomiyake/projects?sort=-analysis_date) report zero open issues; the latest web analysis also has a passed quality gate. The gate is marked “Not computed” on some small Rust projects because SonarCloud has too few new-code lines to evaluate the gate. Overall coverage still exceeds 90% in every project. [SonarQube Cloud automatic analysis does not support Rust](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/automatic-analysis#supported-languages), so Rust LCOV reports are generated with `cargo llvm-cov` and imported with `cargo sonar-scanner`. To run the full sequence locally, start the Compose PostgreSQL test database and set `SONAR_TOKEN`, then run:
+All seven [SonarCloud monorepo projects](https://sonarcloud.io/organizations/marcelomiyake/projects?sort=-analysis_date) report zero open issues. The 2026-10-01 analysis also reported zero bugs, vulnerabilities, and code smells, with all seven quality gates passing. Overall coverage exceeds 90% in every project. [SonarQube Cloud automatic analysis does not support Rust](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/automatic-analysis#supported-languages), so Rust LCOV reports are generated with `cargo llvm-cov` and imported with `cargo sonar-scanner`. To run the full sequence locally, start the Compose PostgreSQL test database and set `SONAR_TOKEN`, then run:
 
 ```sh
 docker compose up -d --wait postgres
@@ -138,6 +138,70 @@ OpenDesign's local telemetry separately recorded 8,089,760 effective-input count
 
 ```text
 Implement https://bytebytego.com/courses/system-design-interview/hotel-reservation-system in Rust, React 19.3 (handoff from OpenDesign [To start it, from ~/.local/share/open-design, run ./node_modules/.bin/tools-dev start. Web UI: http://127.0.0.1:41919, self-hosted]), PostgreSQL, and Kubernetes via local Kind (2 replicas for each microservice). Use SonarQube Cloud via Chrome (https://sonarcloud.io/organizations/marcelomiyake/) to create and manage these monorepo projects, and complete this job with zero SonarQube issues and test coverage above 80%. If you need to run the scanner from the command line, I updated ~/.zshrc with the SONAR_TOKEN. Still, you can also use GitHub Actions and push commits in a loop until the issues are clean (the problem is that Rust is not supported for automatic analysis (https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/automatic-analysis#supported-languages), so use another approach to consider Rust code in SonarQube Cloud (https://docs.sonarsource.com/sonarqube-server/analyzing-source-code/languages/rust); if you generate another SONAR_KEY, update it in the GitHub project or in .zshrc. The frontend should have a perfect Lighthouse grade and good SEO META in 1 Click. Finally, update the README.md with a screenshot and an analysis that includes this prompt, the harness used here (Codex, GPT-6 Luna with max effort), and the token costs from the sessions to complete this task (input tokens, cache tokens, reasoning tokens, output tokens) and LOC. The cache and sessions were empty just before starting this session. Consult the OpenAI official documentation for token prices to estimate total costs.
+```
+
+</details>
+
+## Reservation abandonment analytics (2026-10-01)
+
+The booking flow now records an anonymous journey when the reservation form opens. PostgreSQL stores a compact current-state row in `reservation_journeys` and an append-only event history in `reservation_journey_events`. The journey ID is a random UUID; the analytics events contain hotel and room IDs and the last checkout screen, with no guest name, email address, or payment token.
+
+Screen focus and form activity update the last screen to `guest_details` or `payment`. Same-screen activity heartbeats are rate-limited to once per minute, while section transitions are recorded immediately. When the reservation service confirms a successful payment, it marks the journey completed in the same transaction. A journey is considered abandoned after 30 minutes without activity and remains queryable through the `abandoned_reservation_journeys` view. No administrative frontend was added.
+
+The application sends `POST /api/reservation-journeys` to start a journey and `POST /api/reservation-journeys/{journey_id}/screens` on section transitions and periodic activity heartbeats. The reservation service routes these to `/v1/reservation-journeys` and `/v1/reservation-journeys/{journey_id}/screens`.
+
+Example database query for bookings left in the payment section:
+
+```sql
+SELECT journey_id, hotel_id, room_type_id, last_screen, started_at, last_activity_at
+FROM abandoned_reservation_journeys
+WHERE last_screen = 'payment'
+ORDER BY last_activity_at DESC;
+```
+
+### Change and quality statistics
+
+The feature implementation commit, [`c747869`](https://github.com/marcelomiyake/hotel-rust/commit/c747869746c8b321ce23d9180d80599c7447242b), changed seven files: one SQL migration was created, six existing code, configuration, and test files were changed, and no files were deleted. Its Git diff contains **476 inserted lines and 27 removed lines** (net +449). The new migration creates two tables, two indexes, and the abandonment view.
+
+Across the feature and this README report, the branch diff changes eight files: one created, seven modified, and none deleted, with **542 inserted lines and 29 removed lines** (net +513).
+
+The current source/configuration inventory is **7,264 nonblank LOC across 57 files**, excluding this README, lockfiles, generated/build/dependency directories, and the OpenDesign prototype/assets. The count covers `.rs`, `.ts`, `.tsx`, `.css`, `.html`, `.sql`, `.sh`, `.toml`, `.yaml`, `.yml`, `.json`, `.conf`, and `.svg` files.
+
+| Check | Result |
+| --- | ---: |
+| Rust workspace tests | 34 passed |
+| Frontend tests | 19 passed |
+| Frontend Vitest line coverage | 96.42% |
+| Frontend SonarCloud coverage | 91.7% |
+| Reservation service SonarCloud coverage | 96.5% |
+| SonarCloud open issues across all seven projects | 0 |
+| SonarCloud bugs, vulnerabilities, and code smells across all seven projects | 0 |
+| SonarCloud quality gates | 7 passed |
+
+All six Rust packages passed the repository's `cargo llvm-cov --fail-under-lines 80` checks. The TypeScript check, frontend coverage run, and production build passed. The live Compose smoke check confirmed that Nginx forwards journey events and that a `payment` screen checkpoint is stored in PostgreSQL.
+
+Lighthouse 13.5.0 on the Compose deployment scored **100** in desktop Performance, Accessibility, Best Practices, and SEO. Mobile scored **99** in Performance and **100** in Accessibility, Best Practices, and SEO. The page's SEO META checks scored 100 on both form factors. The brand link accessible name was adjusted to include its visible text.
+
+### Harness and token cost for this feature session
+
+Harness: **Codex, GPT-6 Luna (`gpt-6-luna`), max effort**. The session and cache were empty before the task began, as specified in the prompt. The counters below are the cumulative Codex session-log snapshot at 2026-10-01 17:58 UTC; cached input is included in input, and reasoning is included in output.
+
+| Counter | Tokens | Notes |
+| --- | ---: | --- |
+| Input | 14,112,819 | Includes cached input below |
+| Cached input | 13,818,624 | Subset of input |
+| Uncached input | 294,195 | Input less cached input |
+| Output | 101,151 | Includes reasoning below |
+| Reasoning | 73,774 | Subset of output; not counted twice |
+| Cache writes | 0 | |
+
+The [official OpenAI API pricing](https://developers.openai.com/api/docs/pricing?tab=suite), checked on 2026-10-01, lists standard GPT-6 Luna rates of $0.10/M uncached input, $0.01/M cached input, and $0.50/M output tokens. Using those rates, the API-equivalent estimate is **$0.21818124 USD** (about **$0.22**): $0.02941950 uncached input + $0.13818624 cached input + $0.05057550 output. Reasoning tokens use the output rate and are already included in output. This is a token-based API equivalent, not the Codex subscription charge.
+
+<details>
+<summary>Full prompt analyzed for this feature</summary>
+
+```text
+I want you to implement a new feature that identifies when a user starts a reservation but abandons it before paying. I want us to track which screen the user stopped at before abandoning the reservation. No administrative frontend implementation is needed; I want the data stored in the database (it doesn't need to be the same existing relational database) so we can use it later to improve the system. So it's not necessary to change the frontend features for the user, but you can change the structure to track user events. In this case, if you change it, the frontend should have a perfect Lighthouse grade and good SEO META in 1 Click. Complete this job with zero SonarQube issues (not only new, but zero in total) and test coverage above 80%. I also want to add a new section to README.md with statistics for this new feature. Include the number of changes (how much was deleted, created, changed, etc.), an analysis that includes this prompt, the harness used here (Codex, GPT-6 Luna with max effort), and the token costs from the sessions to complete this task (input tokens, cache tokens, reasoning tokens, output tokens), plus LOC. The cache and sessions were empty just before starting this session. Consult the OpenAI official documentation for token prices to estimate total costs. Commit following https://www.conventionalcommits.org/and push to GitHub after all.
 ```
 
 </details>
