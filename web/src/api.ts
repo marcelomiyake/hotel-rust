@@ -9,6 +9,8 @@ export class ApiError extends Error {
   }
 }
 
+export type ReservationJourneyScreen = "guest_details" | "payment";
+
 async function request<T>(path: string, options: RequestInit = {}, staffToken?: string): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
@@ -74,8 +76,17 @@ export function createReservation(input: {
   check_out: string;
   room_count: number;
   payment_method_token: string;
+  journey_id?: string;
 }): Promise<Reservation> {
   return request("/reservations", json(input));
+}
+
+export function startReservationJourney(input: { journey_id: string; hotel_id: string; room_type_id: string }): Promise<void> {
+  return request("/reservation-journeys", json(input));
+}
+
+export function recordReservationScreen(journeyId: string, screen: ReservationJourneyScreen): Promise<void> {
+  return request(`/reservation-journeys/${encodeURIComponent(journeyId)}/screens`, json({ screen }));
 }
 
 export function getReservation(id: string): Promise<Reservation> {

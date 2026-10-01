@@ -29,6 +29,8 @@ function appFetch(urlValue: RequestInfo | URL, init?: RequestInit): Response {
     const nights = Math.max(1, Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000));
     return jsonResponse(rates(start, nights));
   }
+  if (path === "/api/reservation-journeys" && init?.method === "POST") return jsonResponse({}, 204);
+  if (/^\/api\/reservation-journeys\/[^/]+\/screens$/.test(path) && init?.method === "POST") return jsonResponse({}, 204);
   if (path === "/api/reservations" && init?.method === "POST") {
     const body = JSON.parse(String(init.body));
     return jsonResponse(reservation({ guest_name: body.guest_name, guest_email: body.guest_email, check_in: body.check_in, check_out: body.check_out, room_count: body.room_count, status: chargeStatus }), 201);
@@ -64,7 +66,7 @@ describe("Vela House booking experience", () => {
     expect(await screen.findByRole("heading", { name: "Let the coast set your pace." })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: hotel.name })).toBeInTheDocument();
     await user.click(screen.getByRole("link", { name: /Find your place/ }));
-    await user.click(screen.getByRole("link", { name: "Vela House home" }));
+    await user.click(screen.getByRole("link", { name: "Vela House" }));
     await user.click(screen.getByRole("button", { name: "Search stays" }));
     expect(await screen.findByText(/stay with rooms for your dates/)).toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: "Explore this stay" }));
@@ -75,6 +77,14 @@ describe("Vela House booking experience", () => {
     await user.click(screen.getByRole("button", { name: /Reserve for/ }));
     expect(await screen.findByRole("heading", { name: "Your stay is reserved." })).toBeInTheDocument();
     expect(screen.getByText(/CONFIRMATION 20000000/)).toBeInTheDocument();
+    const calls = vi.mocked(fetch).mock.calls;
+    const startJourney = calls.find(([url, init]) => new URL(String(url), window.location.origin).pathname === "/api/reservation-journeys" && init?.method === "POST");
+    const recordPaymentScreen = calls.find(([url, init]) => new URL(String(url), window.location.origin).pathname.endsWith("/screens") && JSON.parse(String(init?.body)).screen === "payment");
+    const submittedReservation = calls.find(([url, init]) => new URL(String(url), window.location.origin).pathname === "/api/reservations" && init?.method === "POST");
+    expect(JSON.parse(String(startJourney?.[1]?.body))).toMatchObject({ hotel_id: hotel.id, room_type_id: room.id });
+    expect(JSON.parse(String(startJourney?.[1]?.body))).not.toHaveProperty("guest_email");
+    expect(JSON.parse(String(recordPaymentScreen?.[1]?.body))).toEqual({ screen: "payment" });
+    expect(JSON.parse(String(submittedReservation?.[1]?.body))).toHaveProperty("journey_id");
     await user.click(screen.getByRole("link", { name: "My trips" }));
     await user.click(await screen.findByRole("button", { name: "Find my trips" }));
     expect(await screen.findByText("Alex Guest")).toBeInTheDocument();

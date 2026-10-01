@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type SyntheticEvent } from "react";
 import {
   ApiError,
   cancelReservation,
@@ -10,11 +10,14 @@ import {
   getHotels,
   getReservation,
   getTrips,
+  recordReservationScreen,
   saveHotel,
   saveRates,
   saveRoom,
   setHotelActive,
-  setRoomActive
+  setRoomActive,
+  startReservationJourney,
+  type ReservationJourneyScreen
 } from "./api";
 import {
   addDays,
@@ -33,6 +36,7 @@ import { parseRoute, pathFor, type AppRoute } from "./routes";
 import type { AdminOverview, Hotel, HotelInput, HotelOffer, Reservation, RoomType, RoomTypeInput, SearchFilters } from "./types";
 
 type Navigate = (route: AppRoute, replace?: boolean) => void;
+const JOURNEY_ACTIVITY_INTERVAL_MS = 60_000;
 
 function useRoute(): [AppRoute, Navigate] {
   const [route, setRoute] = useState(() => parseRoute(window.location.pathname, window.location.search));
@@ -69,7 +73,7 @@ function App() {
     <a className="skip-link" href="#main-content">Skip to content</a>
     <header className="site-header">
       <div className="header-inner">
-        <a className="brand" href="/" onClick={(event) => { event.preventDefault(); navigate({ page: "home" }); }} aria-label="Vela House home">
+        <a className="brand" href="/" onClick={(event) => { event.preventDefault(); navigate({ page: "home" }); }} aria-label="Vela House">
           <span className="brand-mark">VELA</span><span>HOUSE</span>
         </a>
         <nav className="primary-nav" aria-label="Main navigation">
@@ -223,6 +227,7 @@ function RoomRow({ offer, room, total, available, filters, navigate }: Readonly<
 
 function BookingPage({ slug, roomTypeId, filters, navigate }: Readonly<{ slug: string; roomTypeId: string; filters: SearchFilters; navigate: Navigate }>) {
   const [offer, setOffer] = useState<HotelOffer | null>(null);
+  const [bookingHotelId, setBookingHotelId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [guestName, setGuestName] = useState("");
   const [email, setEmail] = useState("");
@@ -231,12 +236,38 @@ function BookingPage({ slug, roomTypeId, filters, navigate }: Readonly<{ slug: s
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState("");
+  const [journeyId] = useState(() => crypto.randomUUID());
+  const trackedScreen = useRef<ReservationJourneyScreen>("guest_details");
+  const lastActivitySentAt = useRef(0);
+  const journeyReady = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
     let active = true; setLoading(true);
-    getHotel(slug).then((hotel) => loadHotelOffer(hotel, filters)).then((result) => { if (active) setOffer(result); }).catch((reason: unknown) => { if (active) setError(friendlyError(reason)); }).finally(() => { if (active) setLoading(false); });
+    setBookingHotelId(null);
+    getHotel(slug).then((hotel) => {
+      if (active) setBookingHotelId(hotel.id);
+      return loadHotelOffer(hotel, filters);
+    }).then((result) => { if (active) setOffer(result); }).catch((reason: unknown) => { if (active) setError(friendlyError(reason)); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [slug, filters.checkIn, filters.checkOut, filters.guests]);
   const roomOffer = findOfferRoom(offer, roomTypeId);
+  useEffect(() => {
+    if (!bookingHotelId) return;
+    journeyReady.current = startReservationJourney({
+      journey_id: journeyId,
+      hotel_id: bookingHotelId,
+      room_type_id: roomTypeId
+    }).catch(() => undefined);
+  }, [bookingHotelId, journeyId, roomTypeId]);
+  function recordScreen(screen: ReservationJourneyScreen, userActivity = false) {
+    const changed = trackedScreen.current !== screen;
+    const now = Date.now();
+    if (!changed && (!userActivity || now - lastActivitySentAt.current < JOURNEY_ACTIVITY_INTERVAL_MS)) return;
+    trackedScreen.current = screen;
+    lastActivitySentAt.current = now;
+    void journeyReady.current
+      .then(() => recordReservationScreen(journeyId, screen))
+      .catch(() => undefined);
+  }
   const perRoomTotal = roomOffer?.totalCents || 0;
   const total = calculateTotal(roomOffer?.rates.map((rate) => rate.amount_cents) || [], rooms);
   async function submit(event: SyntheticEvent<HTMLFormElement>) {
@@ -245,6 +276,7 @@ function BookingPage({ slug, roomTypeId, filters, navigate }: Readonly<{ slug: s
     if (!isValidEmail(email)) { setError("Enter a valid email address for your reservation details."); return; }
     if (!roomOffer?.availability.available || rooms > roomOffer.availability.available_rooms) { setError("There are not enough rooms left for your selection. Please return to the stay and check availability."); return; }
     if (!paymentToken) { setError("Choose a payment method to continue."); return; }
+    recordScreen("payment", true);
     setSaving(true);
     const requestKey = idempotencyKey || crypto.randomUUID();
     if (!idempotencyKey) setIdempotencyKey(requestKey);
@@ -252,7 +284,8 @@ function BookingPage({ slug, roomTypeId, filters, navigate }: Readonly<{ slug: s
       const reservation = await createReservation({
         idempotency_key: requestKey, hotel_id: offer!.id, room_type_id: roomTypeId,
         guest_name: guestName.trim(), guest_email: email.trim(), check_in: filters.checkIn,
-        check_out: filters.checkOut, room_count: rooms, payment_method_token: paymentToken
+        check_out: filters.checkOut, room_count: rooms, payment_method_token: paymentToken,
+        journey_id: journeyId
       });
       if (reservation.status !== "paid") { setError(reservation.status === "rejected" ? "The payment was declined. Choose another demo payment option and try again." : "The reservation could not be completed. Please try again."); return; }
       sessionStorage.setItem("vela:last-email", email.trim());
@@ -270,12 +303,12 @@ function BookingPage({ slug, roomTypeId, filters, navigate }: Readonly<{ slug: s
         <form className="form-panel" onSubmit={submit} noValidate>
           <h2>Guest details</h2>
           <div className="guest-fields">
-            <label className="od-field"><span>Full name</span><input className="field-control" autoComplete="name" required minLength={2} maxLength={120} value={guestName} onChange={(event) => setGuestName(event.target.value)} placeholder="Name on the reservation" /></label>
-            <label className="od-field"><span>Email address</span><input className="field-control" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" /></label>
-            <label className="od-field"><span>Rooms</span><select className="field-control" value={rooms} onChange={(event) => setRooms(Number(event.target.value))}>{Array.from({ length: Math.max(1, Math.min(8, roomOffer.availability.available_rooms)) }, (_, index) => index + 1).map((count) => <option key={count} value={count}>{count} {count === 1 ? "room" : "rooms"}</option>)}</select></label>
+            <label className="od-field"><span>Full name</span><input className="field-control" autoComplete="name" required minLength={2} maxLength={120} value={guestName} onFocus={() => recordScreen("guest_details", true)} onChange={(event) => { recordScreen("guest_details", true); setGuestName(event.target.value); }} placeholder="Name on the reservation" /></label>
+            <label className="od-field"><span>Email address</span><input className="field-control" type="email" autoComplete="email" required value={email} onFocus={() => recordScreen("guest_details", true)} onChange={(event) => { recordScreen("guest_details", true); setEmail(event.target.value); }} placeholder="you@example.com" /></label>
+            <label className="od-field"><span>Rooms</span><select className="field-control" value={rooms} onFocus={() => recordScreen("guest_details", true)} onChange={(event) => { recordScreen("guest_details", true); setRooms(Number(event.target.value)); }}>{Array.from({ length: Math.max(1, Math.min(8, roomOffer.availability.available_rooms)) }, (_, index) => index + 1).map((count) => <option key={count} value={count}>{count} {count === 1 ? "room" : "rooms"}</option>)}</select></label>
           </div>
           <p className="form-help">Payment is charged in full when you reserve. For this demo, the payment service uses a simulated card token and never stores card details.</p>
-          <label className="od-field"><span>Demo payment</span><select className="field-control" value={paymentToken} onChange={(event) => setPaymentToken(event.target.value)}><option value="tok_demo_visa">Demo card · approved</option><option value="test:decline">Demo card · declined</option></select></label>
+          <label className="od-field"><span>Demo payment</span><select className="field-control" value={paymentToken} onFocus={() => recordScreen("payment", true)} onChange={(event) => { recordScreen("payment", true); setPaymentToken(event.target.value); }}><option value="tok_demo_visa">Demo card · approved</option><option value="test:decline">Demo card · declined</option></select></label>
           {error && <p className="inline-alert" role="alert">{error}</p>}
           <button className="button button--primary" type="submit" disabled={saving || loading}>{saving ? "Securing your room…" : `Reserve for ${formatMoney(total)}`}</button>
         </form>

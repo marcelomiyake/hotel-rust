@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError, cancelReservation, createReservation, getAdminHotels, getAdminOverview, getAdminRooms,
   getAvailability, getHotel, getHotels, getRates, getReservation, getRoomTypes, getTrips,
-  saveHotel, saveRates, saveRoom, setHotelActive, setRoomActive
+  recordReservationScreen, saveHotel, saveRates, saveRoom, setHotelActive, setRoomActive,
+  startReservationJourney
 } from "./api";
 import { hotel, reservation, room } from "./test/fixtures";
 
@@ -21,6 +22,8 @@ describe("HTTP client", () => {
   });
 
   it("calls public hotel, room, availability, rate and reservation endpoints", async () => {
+    await startReservationJourney({ journey_id: "journey-1", hotel_id: hotel.id, room_type_id: room.id });
+    await recordReservationScreen("journey-1", "payment");
     await getHotels("  blue beach ");
     await getHotels();
     await getHotel("casa da maré");
@@ -34,17 +37,21 @@ describe("HTTP client", () => {
     fetchMock.mockResolvedValueOnce(response(204));
     expect(await cancelReservation(reservation().id, "alex@example.test")).toBeUndefined();
 
-    expect(fetchMock).toHaveBeenCalledTimes(11);
-    expect(new URL(String(fetchMock.mock.calls[0]?.[0])).pathname + new URL(String(fetchMock.mock.calls[0]?.[0])).search).toBe("/api/hotels?q=blue+beach");
-    expect(new URL(String(fetchMock.mock.calls[1]?.[0])).pathname).toBe("/api/hotels");
-    expect(String(fetchMock.mock.calls[2]?.[0])).toContain("casa%20da%20mar%C3%A9");
-    expect(fetchMock.mock.calls[4]?.[1]?.headers).toBeInstanceOf(Headers);
-    expect((fetchMock.mock.calls[4]?.[1]?.headers as Headers).get("X-Staff-Token")).toBe("staff-secret");
-    expect(String(fetchMock.mock.calls[5]?.[0])).toContain("rooms=2");
-    expect(String(fetchMock.mock.calls[6]?.[0])).toContain("start_date=2026-10-01");
-    expect(fetchMock.mock.calls[7]?.[1]?.method).toBe("POST");
-    expect(String(fetchMock.mock.calls[9]?.[0])).toContain("guest_email=alex%40example.test");
-    expect(String(fetchMock.mock.calls[10]?.[0])).toContain("/api/reservations/");
+    expect(fetchMock).toHaveBeenCalledTimes(13);
+    expect(new URL(String(fetchMock.mock.calls[0]?.[0])).pathname).toBe("/api/reservation-journeys");
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ journey_id: "journey-1", hotel_id: hotel.id, room_type_id: room.id });
+    expect(new URL(String(fetchMock.mock.calls[1]?.[0])).pathname).toBe("/api/reservation-journeys/journey-1/screens");
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toEqual({ screen: "payment" });
+    expect(new URL(String(fetchMock.mock.calls[2]?.[0])).pathname + new URL(String(fetchMock.mock.calls[2]?.[0])).search).toBe("/api/hotels?q=blue+beach");
+    expect(new URL(String(fetchMock.mock.calls[3]?.[0])).pathname).toBe("/api/hotels");
+    expect(String(fetchMock.mock.calls[4]?.[0])).toContain("casa%20da%20mar%C3%A9");
+    expect(fetchMock.mock.calls[6]?.[1]?.headers).toBeInstanceOf(Headers);
+    expect((fetchMock.mock.calls[6]?.[1]?.headers as Headers).get("X-Staff-Token")).toBe("staff-secret");
+    expect(String(fetchMock.mock.calls[7]?.[0])).toContain("rooms=2");
+    expect(String(fetchMock.mock.calls[8]?.[0])).toContain("start_date=2026-10-01");
+    expect(fetchMock.mock.calls[9]?.[1]?.method).toBe("POST");
+    expect(String(fetchMock.mock.calls[11]?.[0])).toContain("guest_email=alex%40example.test");
+    expect(String(fetchMock.mock.calls[12]?.[0])).toContain("/api/reservations/");
   });
 
   it("sends staff mutations and forwards the credential on every admin request", async () => {

@@ -74,6 +74,36 @@ pub struct ReservationRequest {
     pub check_out: NaiveDate,
     pub room_count: i16,
     pub payment_method_token: String,
+    #[serde(default)]
+    pub journey_id: Option<Uuid>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StartReservationJourneyRequest {
+    pub journey_id: Uuid,
+    pub hotel_id: Uuid,
+    pub room_type_id: Uuid,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum ReservationJourneyScreen {
+    GuestDetails,
+    Payment,
+}
+
+impl ReservationJourneyScreen {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::GuestDetails => "guest_details",
+            Self::Payment => "payment",
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ReservationJourneyScreenRequest {
+    screen: ReservationJourneyScreen,
 }
 
 #[derive(Debug, Deserialize)]
@@ -149,6 +179,11 @@ pub fn app(
     Router::new()
         .route("/healthz", get(health))
         .route("/v1/availability", get(check_availability))
+        .route("/v1/reservation-journeys", post(start_reservation_journey))
+        .route(
+            "/v1/reservation-journeys/{journey_id}/screens",
+            post(record_reservation_screen),
+        )
         .route(
             "/v1/reservations",
             get(list_reservations).post(create_reservation),
@@ -196,6 +231,98 @@ async fn check_availability(
     }))
 }
 
+async fn start_reservation_journey(
+    State(state): State<ReservationState>,
+    Json(input): Json<StartReservationJourneyRequest>,
+) -> AppResult<StatusCode> {
+    let mut transaction = state.pool.begin().await?;
+    let created = sqlx::query_scalar::<_, Uuid>(
+        "INSERT INTO reservation_journeys (journey_id, hotel_id, room_type_id, last_screen, status) VALUES ($1, $2, $3, 'guest_details', 'in_progress') ON CONFLICT (journey_id) DO NOTHING RETURNING journey_id",
+    )
+    .bind(input.journey_id)
+    .bind(input.hotel_id)
+    .bind(input.room_type_id)
+    .fetch_optional(&mut *transaction)
+    .await?;
+
+    if created.is_some() {
+        insert_journey_event(
+            &mut transaction,
+            input.journey_id,
+            "started",
+            "guest_details",
+        )
+        .await?;
+    } else {
+        let existing = sqlx::query_as::<_, (Uuid, Uuid, String)>(
+            "SELECT hotel_id, room_type_id, status FROM reservation_journeys WHERE journey_id = $1 FOR UPDATE",
+        )
+        .bind(input.journey_id)
+        .fetch_optional(&mut *transaction)
+        .await?
+        .ok_or(AppError::Internal)?;
+        if existing.0 != input.hotel_id || existing.1 != input.room_type_id {
+            return Err(AppError::Conflict);
+        }
+        if existing.2 == "in_progress" {
+            sqlx::query(
+                "UPDATE reservation_journeys SET last_activity_at = NOW() WHERE journey_id = $1",
+            )
+            .bind(input.journey_id)
+            .execute(&mut *transaction)
+            .await?;
+        }
+    }
+
+    transaction.commit().await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn record_reservation_screen(
+    State(state): State<ReservationState>,
+    Path(journey_id): Path<Uuid>,
+    Json(input): Json<ReservationJourneyScreenRequest>,
+) -> AppResult<StatusCode> {
+    let mut transaction = state.pool.begin().await?;
+    let existing = sqlx::query_as::<_, (String, String)>(
+        "SELECT last_screen, status FROM reservation_journeys WHERE journey_id = $1 FOR UPDATE",
+    )
+    .bind(journey_id)
+    .fetch_optional(&mut *transaction)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    if existing.1 == "in_progress" {
+        let screen = input.screen.as_str();
+        sqlx::query("UPDATE reservation_journeys SET last_screen = $2, last_activity_at = NOW() WHERE journey_id = $1")
+            .bind(journey_id)
+            .bind(screen)
+            .execute(&mut *transaction)
+            .await?;
+        if existing.0 != screen {
+            insert_journey_event(&mut transaction, journey_id, "screen_viewed", screen).await?;
+        }
+    }
+
+    transaction.commit().await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn insert_journey_event(
+    transaction: &mut Transaction<'_, Postgres>,
+    journey_id: Uuid,
+    event_type: &str,
+    screen: &str,
+) -> AppResult<()> {
+    sqlx::query("INSERT INTO reservation_journey_events (journey_id, event_type, screen) VALUES ($1, $2, $3)")
+        .bind(journey_id)
+        .bind(event_type)
+        .bind(screen)
+        .execute(&mut **transaction)
+        .await?;
+    Ok(())
+}
+
 async fn create_reservation(
     State(state): State<ReservationState>,
     Json(input): Json<ReservationRequest>,
@@ -218,6 +345,11 @@ async fn create_reservation(
         || reservation.status == "rejected"
         || reservation.status == "canceled"
     {
+        if reservation.status == "paid"
+            && let Some(journey_id) = input.journey_id
+        {
+            complete_reservation_journey(&state.pool, journey_id, &reservation).await?;
+        }
         let status = if is_new {
             StatusCode::CREATED
         } else {
@@ -253,7 +385,13 @@ async fn create_reservation(
     if charge.status != "paid" && charge.status != "rejected" {
         return Err(AppError::Upstream);
     }
-    let reservation = finish_payment(&state.pool, reservation.id, charge.status == "paid").await?;
+    let reservation = finish_payment(
+        &state.pool,
+        reservation.id,
+        charge.status == "paid",
+        input.journey_id,
+    )
+    .await?;
     let status = if is_new {
         StatusCode::CREATED
     } else {
@@ -481,7 +619,12 @@ async fn reserve_inventory(
     Ok((reservation, is_new))
 }
 
-async fn finish_payment(pool: &PgPool, reservation_id: Uuid, paid: bool) -> AppResult<Reservation> {
+async fn finish_payment(
+    pool: &PgPool,
+    reservation_id: Uuid,
+    paid: bool,
+    journey_id: Option<Uuid>,
+) -> AppResult<Reservation> {
     let mut transaction = pool.begin().await?;
     let reservation = sqlx::query_as::<_, Reservation>(
         "SELECT id, idempotency_key, hotel_id, room_type_id, guest_name, guest_email, check_in, check_out, room_count, total_cents, status, created_at FROM reservations WHERE id = $1 FOR UPDATE",
@@ -502,9 +645,59 @@ async fn finish_payment(pool: &PgPool, reservation_id: Uuid, paid: bool) -> AppR
             .execute(&mut *transaction)
             .await?;
     }
+    if paid && let Some(journey_id) = journey_id {
+        complete_reservation_journey_tx(&mut transaction, journey_id, &reservation).await?;
+    }
     let updated = fetch_reservation_tx(&mut transaction, reservation_id).await?;
     transaction.commit().await?;
     Ok(updated)
+}
+
+async fn complete_reservation_journey(
+    pool: &PgPool,
+    journey_id: Uuid,
+    reservation: &Reservation,
+) -> AppResult<()> {
+    let mut transaction = pool.begin().await?;
+    complete_reservation_journey_tx(&mut transaction, journey_id, reservation).await?;
+    transaction.commit().await?;
+    Ok(())
+}
+
+async fn complete_reservation_journey_tx(
+    transaction: &mut Transaction<'_, Postgres>,
+    journey_id: Uuid,
+    reservation: &Reservation,
+) -> AppResult<()> {
+    let created = sqlx::query_scalar::<_, Uuid>(
+        "INSERT INTO reservation_journeys (journey_id, hotel_id, room_type_id, last_screen, status, started_at, last_activity_at, completed_at, reservation_id) VALUES ($1, $2, $3, 'confirmation', 'completed', $4, NOW(), NOW(), $5) ON CONFLICT (journey_id) DO NOTHING RETURNING journey_id",
+    )
+    .bind(journey_id)
+    .bind(reservation.hotel_id)
+    .bind(reservation.room_type_id)
+    .bind(reservation.created_at)
+    .bind(reservation.id)
+    .fetch_optional(&mut **transaction)
+    .await?;
+
+    if created.is_some() {
+        insert_journey_event(transaction, journey_id, "started", "guest_details").await?;
+    }
+
+    let completed = sqlx::query_scalar::<_, Uuid>(
+        "UPDATE reservation_journeys SET last_screen = 'confirmation', status = 'completed', last_activity_at = NOW(), completed_at = NOW(), reservation_id = $2 WHERE journey_id = $1 AND status = 'in_progress' AND hotel_id = $3 AND room_type_id = $4 RETURNING journey_id",
+    )
+    .bind(journey_id)
+    .bind(reservation.id)
+    .bind(reservation.hotel_id)
+    .bind(reservation.room_type_id)
+    .fetch_optional(&mut **transaction)
+    .await?;
+
+    if created.is_some() || completed.is_some() {
+        insert_journey_event(transaction, journey_id, "completed", "confirmation").await?;
+    }
+    Ok(())
 }
 
 async fn cancel(pool: &PgPool, reservation_id: Uuid, guest_email: &str) -> AppResult<Reservation> {
@@ -720,6 +913,7 @@ mod tests {
             check_out: future_date(4),
             room_count: 1,
             payment_method_token: "test:success".into(),
+            journey_id: None,
         }
     }
 
@@ -952,7 +1146,7 @@ mod tests {
     async fn reservation_routes_lock_inventory_charge_cancel_and_refund_idempotently() {
         let Some(pool) = database().await else { return };
         let (upstream, server) = mock_upstream().await;
-        let router = app(pool, upstream.clone(), upstream, "staff-test");
+        let router = app(pool.clone(), upstream.clone(), upstream, "staff-test");
         assert_eq!(
             call(&router, Method::GET, "/healthz", None, None)
                 .await
@@ -982,8 +1176,84 @@ mod tests {
             StatusCode::BAD_REQUEST
         );
 
+        let journey_id = Uuid::new_v4();
+        let start_journey =
+            json!({ "journey_id":journey_id, "hotel_id":hotel_id, "room_type_id":room_id });
+        assert_eq!(
+            call(
+                &router,
+                Method::POST,
+                "/v1/reservation-journeys",
+                Some(start_journey.clone()),
+                None
+            )
+            .await
+            .status(),
+            StatusCode::NO_CONTENT
+        );
+        assert_eq!(
+            call(
+                &router,
+                Method::POST,
+                "/v1/reservation-journeys",
+                Some(start_journey.clone()),
+                None
+            )
+            .await
+            .status(),
+            StatusCode::NO_CONTENT
+        );
+        assert_eq!(
+            call(
+                &router,
+                Method::POST,
+                &format!("/v1/reservation-journeys/{journey_id}/screens"),
+                Some(json!({ "screen":"payment" })),
+                None
+            )
+            .await
+            .status(),
+            StatusCode::NO_CONTENT
+        );
+        assert_eq!(
+            call(
+                &router,
+                Method::POST,
+                &format!("/v1/reservation-journeys/{journey_id}/screens"),
+                Some(json!({ "screen":"payment" })),
+                None
+            )
+            .await
+            .status(),
+            StatusCode::NO_CONTENT
+        );
+        assert_eq!(
+            call(
+                &router,
+                Method::POST,
+                &format!("/v1/reservation-journeys/{journey_id}/screens"),
+                Some(json!({ "screen":"not_a_screen" })),
+                None
+            )
+            .await
+            .status(),
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        assert_eq!(
+            call(
+                &router,
+                Method::POST,
+                &format!("/v1/reservation-journeys/{}/screens", Uuid::new_v4()),
+                Some(json!({ "screen":"payment" })),
+                None
+            )
+            .await
+            .status(),
+            StatusCode::NOT_FOUND
+        );
+
         let idempotency_key = format!("coverage-booking-{}", Uuid::new_v4());
-        let booking = json!({ "idempotency_key":idempotency_key, "hotel_id":hotel_id, "room_type_id":room_id, "guest_name":"Alex Guest", "guest_email":"Alex@Example.test", "check_in":check_in, "check_out":check_out, "room_count":1, "payment_method_token":"test:success" });
+        let booking = json!({ "idempotency_key":idempotency_key, "journey_id":journey_id, "hotel_id":hotel_id, "room_type_id":room_id, "guest_name":"Alex Guest", "guest_email":"Alex@Example.test", "check_in":check_in, "check_out":check_out, "room_count":1, "payment_method_token":"test:success" });
         let invalid_booking = json!({ "idempotency_key":"", "hotel_id":hotel_id, "room_type_id":room_id, "guest_name":"Alex Guest", "guest_email":"alex@example.test", "check_in":check_in, "check_out":check_out, "room_count":1, "payment_method_token":"test:success" });
         assert_eq!(
             call(
@@ -1010,6 +1280,54 @@ mod tests {
         assert_eq!(created["status"], "paid");
         assert_eq!(created["total_cents"], 170000);
         let reservation_id = created["id"].as_str().unwrap();
+        let journey = sqlx::query_as::<_, (String, String, Option<Uuid>)>(
+            "SELECT status, last_screen, reservation_id FROM reservation_journeys WHERE journey_id = $1",
+        )
+        .bind(journey_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            journey,
+            (
+                "completed".into(),
+                "confirmation".into(),
+                Some(Uuid::parse_str(reservation_id).unwrap())
+            )
+        );
+        let event_count = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM reservation_journey_events WHERE journey_id = $1",
+        )
+        .bind(journey_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(event_count, 3);
+        let abandoned_id = Uuid::new_v4();
+        assert_eq!(call(&router, Method::POST, "/v1/reservation-journeys", Some(json!({ "journey_id":abandoned_id, "hotel_id":hotel_id, "room_type_id":room_id })), None).await.status(), StatusCode::NO_CONTENT);
+        assert_eq!(
+            call(
+                &router,
+                Method::POST,
+                &format!("/v1/reservation-journeys/{abandoned_id}/screens"),
+                Some(json!({ "screen":"payment" })),
+                None
+            )
+            .await
+            .status(),
+            StatusCode::NO_CONTENT
+        );
+        sqlx::query("UPDATE reservation_journeys SET last_activity_at = NOW() - INTERVAL '31 minutes' WHERE journey_id = $1")
+            .bind(abandoned_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let abandoned = sqlx::query_as::<_, (Uuid, String)>("SELECT journey_id, last_screen FROM abandoned_reservation_journeys WHERE journey_id = $1")
+            .bind(abandoned_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(abandoned, (abandoned_id, "payment".into()));
         let replay = call(
             &router,
             Method::POST,
@@ -1020,6 +1338,14 @@ mod tests {
         .await;
         assert_eq!(replay.status(), StatusCode::OK);
         assert_eq!(response_json(replay).await["id"], reservation_id);
+        let replay_event_count = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM reservation_journey_events WHERE journey_id = $1",
+        )
+        .bind(journey_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(replay_event_count, 3);
         let mismatch = json!({ "idempotency_key":booking["idempotency_key"], "hotel_id":hotel_id, "room_type_id":room_id, "guest_name":"Another Guest", "guest_email":"Alex@Example.test", "check_in":check_in, "check_out":check_out, "room_count":1, "payment_method_token":"test:success" });
         assert_eq!(
             call(
@@ -1129,7 +1455,21 @@ mod tests {
         assert_eq!(response_json(after_cancel).await["available_rooms"], 4);
 
         let rejected_idempotency_key = format!("coverage-declined-{}", Uuid::new_v4());
-        let declined = json!({ "idempotency_key":rejected_idempotency_key, "hotel_id":hotel_id, "room_type_id":room_id, "guest_name":"Taylor Guest", "guest_email":"taylor@example.test", "check_in":check_in + Duration::days(4), "check_out":check_out + Duration::days(4), "room_count":1, "payment_method_token":"test:decline" });
+        let rejected_journey_id = Uuid::new_v4();
+        assert_eq!(call(&router, Method::POST, "/v1/reservation-journeys", Some(json!({ "journey_id":rejected_journey_id, "hotel_id":hotel_id, "room_type_id":room_id })), None).await.status(), StatusCode::NO_CONTENT);
+        assert_eq!(
+            call(
+                &router,
+                Method::POST,
+                &format!("/v1/reservation-journeys/{rejected_journey_id}/screens"),
+                Some(json!({ "screen":"payment" })),
+                None
+            )
+            .await
+            .status(),
+            StatusCode::NO_CONTENT
+        );
+        let declined = json!({ "idempotency_key":rejected_idempotency_key, "journey_id":rejected_journey_id, "hotel_id":hotel_id, "room_type_id":room_id, "guest_name":"Taylor Guest", "guest_email":"taylor@example.test", "check_in":check_in + Duration::days(4), "check_out":check_out + Duration::days(4), "room_count":1, "payment_method_token":"test:decline" });
         let declined = call(
             &router,
             Method::POST,
@@ -1140,6 +1480,14 @@ mod tests {
         .await;
         let declined = response_json(declined).await;
         assert_eq!(declined["status"], "rejected");
+        let rejected_journey = sqlx::query_as::<_, (String, String)>(
+            "SELECT status, last_screen FROM reservation_journeys WHERE journey_id = $1",
+        )
+        .bind(rejected_journey_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(rejected_journey, ("in_progress".into(), "payment".into()));
         assert_eq!(
             call(&router, Method::GET, "/v1/admin/reservations", None, None)
                 .await
